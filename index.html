@@ -1,543 +1,383 @@
-<!DOCTYPE html>
-<html lang="ms">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sistem Pengurusan Markah UPSA 2026</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.23/jspdf.plugin.autotable.min.js"></script>
-    <style>
-        .loading-overlay {
-            display: none;
-            position: fixed;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(255,255,255,0.9);
-            z-index: 9999; justify-content: center; align-items: center;
-        }
-        .active-view { display: block !important; }
-    </style>
-</head>
-<body class="bg-gray-50 font-sans text-gray-900">
+import React, { useState, useEffect } from 'react';
+import { 
+  Users, 
+  BookOpen, 
+  LayoutDashboard, 
+  LogOut, 
+  Plus, 
+  Search, 
+  Trophy, 
+  UserCheck, 
+  ChevronRight,
+  GraduationCap,
+  Save,
+  Trash2,
+  Edit3
+} from 'lucide-react';
 
-    <!-- Elemen Memuatkan (Loading) -->
-    <div id="loading" class="loading-overlay flex flex-col">
-        <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-        <p class="mt-4 text-gray-600 font-medium">Memuatkan...</p>
-    </div>
+// --- DATA MOCK (SIMULASI) ---
+const INITIAL_STUDENTS = [
+  { id: 1, name: 'Ahmad bin Ibrahim', class: '5 Al-Biruni', marks: { BM: 85, BI: 78, Math: 92, Science: 88 } },
+  { id: 2, name: 'Siti Nurhaliza', class: '5 Al-Biruni', marks: { BM: 92, BI: 88, Math: 75, Science: 82 } },
+  { id: 3, name: 'Chong Wei Hao', class: '5 Al-Khawarizmi', marks: { BM: 70, BI: 95, Math: 98, Science: 90 } },
+  { id: 4, name: 'Ramasamy', class: '5 Al-Khawarizmi', marks: { BM: 75, BI: 72, Math: 80, Science: 78 } },
+];
 
-    <!-- Paparan Log Masuk -->
-    <div id="view-login" class="min-h-screen flex items-center justify-center bg-blue-600 px-4">
-        <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-md">
-            <h2 class="text-3xl font-bold text-center text-blue-800 mb-2">UPSA 2026</h2>
-            <p class="text-center text-gray-500 mb-8">Sistem Pengurusan Markah</p>
-            
-            <form id="login-form" class="space-y-4">
-                <div>
-                    <label class="block text-sm font-medium text-gray-700">Email</label>
-                    <input type="email" id="login-email" class="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" required placeholder="guru@sekolah.edu.my">
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700">Kata Laluan</label>
-                    <input type="password" id="login-password" class="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" required placeholder="••••••••">
-                </div>
-                <button type="submit" id="btn-login" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg transition-colors">Log Masuk</button>
-            </form>
-            <p id="login-error" class="text-red-500 text-sm mt-4 text-center hidden"></p>
+const SUBJECTS = [
+  { id: 'BM', name: 'Bahasa Melayu' },
+  { id: 'BI', name: 'Bahasa Inggeris' },
+  { id: 'Math', name: 'Matematik' },
+  { id: 'Science', name: 'Sains' },
+];
+
+const App = () => {
+  const [user, setUser] = useState(null);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [view, setView] = useState('dashboard');
+  const [students, setStudents] = useState(INITIAL_STUDENTS);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedSubject, setSelectedSubject] = useState('BM');
+
+  // Simulasi Login
+  const handleLogin = (e) => {
+    e.preventDefault();
+    if (email === 'admin@sekolah.edu' && password === 'admin123') {
+      setUser({ role: 'admin', name: 'Admin Utama', email });
+    } else if (email === 'guru@sekolah.edu' && password === 'guru123') {
+      setUser({ role: 'guru', name: 'Cikgu Sarah', email });
+    } else {
+      alert('Kredential salah! Guna admin@sekolah.edu/admin123 atau guru@sekolah.edu/guru123');
+    }
+  };
+
+  const handleLogout = () => {
+    setUser(null);
+    setView('dashboard');
+  };
+
+  const calculateGrade = (mark) => {
+    if (mark >= 80) return { grade: 'A', color: 'text-green-600' };
+    if (mark >= 70) return { grade: 'B', color: 'text-blue-600' };
+    if (mark >= 50) return { grade: 'C', color: 'text-yellow-600' };
+    if (mark >= 40) return { grade: 'D', color: 'text-orange-600' };
+    return { grade: 'G', color: 'text-red-600' };
+  };
+
+  const updateMark = (studentId, subjectId, newMark) => {
+    const val = parseInt(newMark) || 0;
+    setStudents(students.map(s => 
+      s.id === studentId ? { ...s, marks: { ...s.marks, [subjectId]: Math.min(100, Math.max(0, val)) } } : s
+    ));
+  };
+
+  // --- KOMPONEN UI ---
+
+  const LoginPage = () => (
+    <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4">
+      <div className="max-w-md w-full bg-white rounded-2xl shadow-xl p-8 border border-slate-100">
+        <div className="text-center mb-8">
+          <div className="bg-blue-600 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+            <GraduationCap className="text-white w-10 h-10" />
+          </div>
+          <h1 className="text-2xl font-bold text-slate-800">Sistem Akademik Sekolah</h1>
+          <p className="text-slate-500 mt-2">Log masuk untuk teruskan</p>
         </div>
-    </div>
-
-    <!-- Utama Dashboard Shell -->
-    <div id="view-main" class="hidden min-h-screen flex flex-col">
-        <!-- Navigasi -->
-        <nav class="bg-white border-b sticky top-0 z-50">
-            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                <div class="flex justify-between h-16">
-                    <div class="flex items-center">
-                        <span class="text-xl font-bold text-blue-700">UPSA 2026</span>
-                    </div>
-                    <div class="flex items-center space-x-4">
-                        <span id="user-display" class="text-sm font-medium text-gray-600"></span>
-                        <button onclick="logout()" class="bg-red-50 text-red-600 px-4 py-2 rounded-lg text-sm font-semibold hover:bg-red-100 transition">Logout</button>
-                    </div>
-                </div>
-            </div>
-        </nav>
-
-        <!-- Dashboard Admin -->
-        <main id="view-admin" class="hidden flex-1 p-6 max-w-7xl mx-auto w-full">
-            <h1 class="text-2xl font-bold mb-6">Panel Pentadbir (Admin)</h1>
-            
-            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-                <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-                    <p class="text-sm text-gray-500 uppercase font-semibold">Purata GPS</p>
-                    <p id="admin-gps" class="text-3xl font-bold text-blue-600">0.00</p>
-                </div>
-                <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-                    <p class="text-sm text-gray-500 uppercase font-semibold">Peratus Lulus</p>
-                    <p id="admin-lulus" class="text-3xl font-bold text-green-600">0%</p>
-                </div>
-                <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-                    <p class="text-sm text-gray-500 uppercase font-semibold">Jumlah Murid</p>
-                    <p id="admin-murid" class="text-3xl font-bold text-purple-600">0</p>
-                </div>
-                <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-                    <p class="text-sm text-gray-500 uppercase font-semibold">Gagal Semua</p>
-                    <p id="admin-gagal" class="text-3xl font-bold text-red-600">0</p>
-                </div>
-            </div>
-
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-                <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-                    <h3 class="font-bold mb-4">Purata Markah Setiap Subjek</h3>
-                    <canvas id="chart-admin-bar"></canvas>
-                </div>
-                <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-                    <h3 class="font-bold mb-4">Agihan Gred Keseluruhan</h3>
-                    <canvas id="chart-admin-pie"></canvas>
-                </div>
-            </div>
-
-            <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-                <div class="p-4 bg-gray-50 border-b flex justify-between items-center">
-                    <h3 class="font-bold">Analisis Keputusan Murid</h3>
-                    <button onclick="exportToPDF()" class="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm">Cetak PDF</button>
-                </div>
-                <div class="overflow-x-auto">
-                    <table class="w-full text-left border-collapse">
-                        <thead class="bg-gray-100 text-xs uppercase font-semibold text-gray-600">
-                            <tr>
-                                <th class="p-4">Nama</th>
-                                <th class="p-4">Kelas</th>
-                                <th class="p-4">Purata</th>
-                                <th class="p-4">Gred</th>
-                                <th class="p-4">Status</th>
-                            </tr>
-                        </thead>
-                        <tbody id="admin-table-body" class="divide-y"></tbody>
-                    </table>
-                </div>
-            </div>
-        </main>
-
-        <!-- Dashboard Guru -->
-        <main id="view-guru" class="hidden flex-1 p-6 max-w-7xl mx-auto w-full">
-            <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6">
-                <div>
-                    <h1 class="text-2xl font-bold">Dashboard Guru</h1>
-                    <p id="guru-info" class="text-gray-500"></p>
-                </div>
-                <div class="mt-4 md:mt-0 flex space-x-2">
-                    <select id="filter-kelas" class="border p-2 rounded-lg text-sm bg-white" onchange="filterGuruTable()">
-                        <option value="">Semua Kelas</option>
-                    </select>
-                </div>
-            </div>
-
-            <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-                <div class="p-4 bg-gray-50 border-b flex justify-between items-center">
-                    <h3 class="font-bold">Kemasukan Markah</h3>
-                    <span class="text-xs text-gray-400">Pilih murid untuk isi/edit markah</span>
-                </div>
-                <div class="overflow-x-auto">
-                    <table class="w-full text-left">
-                        <thead class="bg-gray-100 text-xs font-semibold uppercase">
-                            <tr>
-                                <th class="p-4">Nama Murid</th>
-                                <th class="p-4">Kelas</th>
-                                <th class="p-4">Markah (Subjek Anda)</th>
-                                <th class="p-4">Gred</th>
-                                <th class="p-4">Tindakan</th>
-                            </tr>
-                        </thead>
-                        <tbody id="guru-table-body" class="divide-y"></tbody>
-                    </table>
-                </div>
-            </div>
-        </main>
-    </div>
-
-    <!-- Modal Input Markah -->
-    <div id="modal-mark" class="hidden fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-4">
-        <div class="bg-white rounded-2xl w-full max-w-md p-6 shadow-2xl">
-            <h3 id="modal-title" class="text-xl font-bold mb-4">Input Markah</h3>
-            <form id="mark-form" class="space-y-4">
-                <input type="hidden" id="modal-student-id">
-                <div>
-                    <label class="block text-sm font-medium mb-1">Markah (0-100)</label>
-                    <input type="number" id="modal-mark-input" min="0" max="100" class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500" required>
-                </div>
-                <div class="flex space-x-3 pt-2">
-                    <button type="button" onclick="closeModal()" class="flex-1 bg-gray-200 py-3 rounded-xl font-semibold">Batal</button>
-                    <button type="submit" class="flex-1 bg-blue-600 text-white py-3 rounded-xl font-bold shadow-lg">Simpan</button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    <script>
-        // --- KONFIGURASI SUPABASE ---
-        const SUPABASE_URL = "https://obqdnbamhaimbbehsssg.supabase.co"; 
-        const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9icWRuYmFtaGFpbWJiZWhzc3NnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY4NjEyMTEsImV4cCI6MjA5MjQzNzIxMX0.va25HWu-66e6lBXMH5paskb6wAaZLGZPLEBKHfpfyQs"; 
         
-        const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+        <form onSubmit={handleLogin} className="space-y-6">
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-2">Alamat Emel</label>
+            <input 
+              type="email" 
+              required
+              className="w-full px-4 py-3 rounded-lg border border-slate-200 focus:ring-2 focus:ring-blue-500 outline-none transition"
+              placeholder="nama@sekolah.edu"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-2">Kata Laluan</label>
+            <input 
+              type="password" 
+              required
+              className="w-full px-4 py-3 rounded-lg border border-slate-200 focus:ring-2 focus:ring-blue-500 outline-none transition"
+              placeholder="••••••••"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            />
+          </div>
+          <button 
+            type="submit"
+            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-lg shadow-lg shadow-blue-200 transition transform active:scale-95"
+          >
+            Log Masuk
+          </button>
+        </form>
+        
+        <div className="mt-8 pt-6 border-t border-slate-100 text-xs text-slate-400 text-center">
+          Disediakan oleh Unit ICT Sekolah &copy; 2024
+        </div>
+      </div>
+    </div>
+  );
 
-        // --- STATE PENGGUNA ---
-        let currentUser = null;
-        let profile = null;
-        let allStudents = [];
-        let allMarks = [];
-        let allSubjects = [];
+  const Sidebar = () => (
+    <div className="w-64 bg-slate-900 min-h-screen text-slate-300 flex flex-col fixed left-0 top-0">
+      <div className="p-6 border-b border-slate-800 flex items-center gap-3">
+        <GraduationCap className="text-blue-400 w-8 h-8" />
+        <span className="font-bold text-white tracking-tight">EDU-Portal</span>
+      </div>
+      
+      <nav className="flex-1 p-4 space-y-2">
+        <button 
+          onClick={() => setView('dashboard')}
+          className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition ${view === 'dashboard' ? 'bg-blue-600 text-white' : 'hover:bg-slate-800'}`}
+        >
+          <LayoutDashboard size={20} /> Dashboard
+        </button>
+        <button 
+          onClick={() => setView('students')}
+          className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition ${view === 'students' ? 'bg-blue-600 text-white' : 'hover:bg-slate-800'}`}
+        >
+          <Users size={20} /> {user.role === 'admin' ? 'Data Murid' : 'Kelas Saya'}
+        </button>
+        {user.role === 'admin' && (
+          <button 
+            onClick={() => setView('subjects')}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition ${view === 'subjects' ? 'bg-blue-600 text-white' : 'hover:bg-slate-800'}`}
+          >
+            <BookOpen size={20} /> Urus Subjek
+          </button>
+        )}
+      </nav>
 
-        // --- LOGIK GRED ---
-        const getGrade = (m) => {
-            if (m === null || m === undefined || m === '-' || m === '') return { g: '-', p: 0 };
-            const val = parseFloat(m);
-            if (val >= 85) return { g: 'A', p: 1 };
-            if (val >= 70) return { g: 'B', p: 2 };
-            if (val >= 60) return { g: 'C', p: 3 };
-            if (val >= 50) return { g: 'D', p: 4 };
-            return { g: 'E', p: 5 };
-        };
+      <div className="p-4 border-t border-slate-800">
+        <div className="flex items-center gap-3 px-4 py-3 bg-slate-800 rounded-xl mb-4">
+          <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-white font-bold text-xs">
+            {user.name.charAt(0)}
+          </div>
+          <div className="overflow-hidden">
+            <p className="text-sm font-medium text-white truncate">{user.name}</p>
+            <p className="text-xs text-slate-400 capitalize">{user.role}</p>
+          </div>
+        </div>
+        <button 
+          onClick={handleLogout}
+          className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-red-400 hover:bg-red-500/10 transition"
+        >
+          <LogOut size={20} /> Log Keluar
+        </button>
+      </div>
+    </div>
+  );
 
-        const showLoading = (show) => {
-            document.getElementById('loading').style.display = show ? 'flex' : 'none';
-        };
+  const DashboardHome = () => {
+    const totalStudents = students.length;
+    const avgScore = (students.reduce((acc, s) => acc + Object.values(s.marks).reduce((a, b) => a + b, 0) / 4, 0) / totalStudents).toFixed(1);
 
-        // --- AUTH ---
-        async function initAuth() {
-            showLoading(true);
-            try {
-                const { data: { session } } = await supabaseClient.auth.getSession();
-                if (session) {
-                    await setupUser(session.user);
-                } else {
-                    showView('login');
-                }
-            } catch (err) {
-                console.error("Auth Error:", err);
-                showView('login');
-            } finally {
-                showLoading(false);
-            }
-        }
+    return (
+      <div className="space-y-6">
+        <header className="flex justify-between items-center">
+          <div>
+            <h1 className="text-2xl font-bold text-slate-800">Selamat Kembali, {user.name}</h1>
+            <p className="text-slate-500">Ringkasan pencapaian semasa sekolah.</p>
+          </div>
+          <div className="text-right">
+            <p className="text-sm text-slate-400 font-medium">Sesi Akademik 2024/2025</p>
+          </div>
+        </header>
 
-        async function setupUser(user) {
-            currentUser = user;
-            
-            // Ambil profil
-            const { data, error } = await supabaseClient
-                .from('profiles')
-                .select('*')
-                .eq('id', user.id)
-                .maybeSingle();
+        {/* Stats Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          {[
+            { label: 'Jumlah Murid', val: totalStudents, icon: Users, color: 'text-blue-600', bg: 'bg-blue-100' },
+            { label: 'Purata Markah', val: avgScore + '%', icon: Trophy, color: 'text-amber-600', bg: 'bg-amber-100' },
+            { label: 'Subjek Aktif', val: SUBJECTS.length, icon: BookOpen, color: 'text-emerald-600', bg: 'bg-emerald-100' },
+            { label: 'Kehadiran Guru', val: '98%', icon: UserCheck, color: 'text-purple-600', bg: 'bg-purple-100' },
+          ].map((stat, i) => (
+            <div key={i} className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-4">
+              <div className={`${stat.bg} ${stat.color} p-3 rounded-xl`}>
+                <stat.icon size={24} />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-slate-500">{stat.label}</p>
+                <p className="text-2xl font-bold text-slate-800">{stat.val}</p>
+              </div>
+            </div>
+          ))}
+        </div>
 
-            if (!data) {
-                // Jika profil tiada, cuba ambil peranan dari metadata atau default 'guru'
-                const userRole = user.user_metadata?.role || 'guru';
-                const { data: newProfile, error: insErr } = await supabaseClient
-                    .from('profiles')
-                    .insert({
-                        id: user.id,
-                        nama: user.user_metadata?.nama || user.email,
-                        role: userRole
+        {/* Chart Area Simulation */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
+            <h3 className="font-bold text-slate-800 mb-6 flex items-center gap-2">
+              <Trophy size={18} className="text-amber-500" /> Pelajar Cemerlang (5 Al-Biruni)
+            </h3>
+            <div className="space-y-4">
+              {students.sort((a,b) => b.marks.Math - a.marks.Math).slice(0, 3).map((s, i) => (
+                <div key={i} className="flex items-center justify-between p-3 bg-slate-50 rounded-xl">
+                  <div className="flex items-center gap-3">
+                    <span className="font-bold text-slate-400 w-5">#{i+1}</span>
+                    <p className="font-medium text-slate-700">{s.name}</p>
+                  </div>
+                  <span className="text-blue-600 font-bold">{((s.marks.BM + s.marks.BI + s.marks.Math + s.marks.Science)/4).toFixed(0)}%</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
+            <h3 className="font-bold text-slate-800 mb-6">Prestasi Mengikut Subjek</h3>
+            <div className="space-y-5">
+              {SUBJECTS.map(subj => {
+                const avg = (students.reduce((acc, s) => acc + s.marks[subj.id], 0) / students.length).toFixed(0);
+                return (
+                  <div key={subj.id}>
+                    <div className="flex justify-between text-sm mb-1">
+                      <span className="text-slate-600">{subj.name}</span>
+                      <span className="font-bold">{avg}%</span>
+                    </div>
+                    <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+                      <div 
+                        className="bg-blue-500 h-full transition-all duration-500" 
+                        style={{ width: `${avg}%` }}
+                      ></div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const MarkahManager = () => {
+    const filteredStudents = students.filter(s => 
+      s.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+      s.class.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+
+    return (
+      <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+        <div className="p-6 border-b border-slate-100 flex flex-col md:flex-row gap-4 justify-between items-center">
+          <div>
+            <h2 className="text-xl font-bold text-slate-800">
+              {user.role === 'admin' ? 'Pengurusan Markah Keseluruhan' : 'Kemasukan Markah Guru'}
+            </h2>
+            <p className="text-sm text-slate-500">Kemaskini dan pantau markah peperiksaan murid.</p>
+          </div>
+          
+          <div className="flex gap-3 w-full md:w-auto">
+            <div className="relative flex-1 md:w-64">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+              <input 
+                type="text" 
+                placeholder="Cari murid..."
+                className="pl-10 pr-4 py-2 w-full rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-blue-500"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+            {user.role === 'guru' && (
+              <select 
+                className="px-4 py-2 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-blue-500 bg-white font-medium"
+                value={selectedSubject}
+                onChange={(e) => setSelectedSubject(e.target.value)}
+              >
+                {SUBJECTS.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+              </select>
+            )}
+          </div>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-left">
+            <thead className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wider font-semibold">
+              <tr>
+                <th className="px-6 py-4">Nama Pelajar</th>
+                <th className="px-6 py-4">Kelas</th>
+                {user.role === 'admin' ? (
+                  SUBJECTS.map(s => <th key={s.id} className="px-6 py-4 text-center">{s.id}</th>)
+                ) : (
+                  <>
+                    <th className="px-6 py-4 text-center">Markah ({selectedSubject})</th>
+                    <th className="px-6 py-4 text-center">Gred</th>
+                    <th className="px-6 py-4 text-center">Tindakan</th>
+                  </>
+                )}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {filteredStudents.map(student => (
+                <tr key={student.id} className="hover:bg-slate-50 transition">
+                  <td className="px-6 py-4">
+                    <div className="font-semibold text-slate-800">{student.name}</div>
+                    <div className="text-xs text-slate-400">ID: STU{student.id.toString().padStart(3, '0')}</div>
+                  </td>
+                  <td className="px-6 py-4">
+                    <span className="px-3 py-1 bg-blue-50 text-blue-600 rounded-full text-xs font-bold">
+                      {student.class}
+                    </span>
+                  </td>
+                  
+                  {user.role === 'admin' ? (
+                    SUBJECTS.map(s => {
+                      const score = student.marks[s.id];
+                      const { color } = calculateGrade(score);
+                      return (
+                        <td key={s.id} className="px-6 py-4 text-center">
+                          <span className={`font-bold ${color}`}>{score}</span>
+                        </td>
+                      );
                     })
-                    .select()
-                    .single();
-                
-                if (insErr) {
-                    console.error("Error creating profile:", insErr);
-                    return;
-                }
-                profile = newProfile;
-            } else {
-                profile = data;
-            }
+                  ) : (
+                    <>
+                      <td className="px-6 py-4 text-center">
+                        <input 
+                          type="number"
+                          className="w-16 px-2 py-1 border border-slate-200 rounded-lg text-center font-bold focus:border-blue-500 outline-none"
+                          value={student.marks[selectedSubject]}
+                          onChange={(e) => updateMark(student.id, selectedSubject, e.target.value)}
+                        />
+                      </td>
+                      <td className="px-6 py-4 text-center">
+                        <span className={`font-black text-lg ${calculateGrade(student.marks[selectedSubject]).color}`}>
+                          {calculateGrade(student.marks[selectedSubject]).grade}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-center">
+                        <button className="text-slate-400 hover:text-blue-500 transition">
+                          <Save size={18} />
+                        </button>
+                      </td>
+                    </>
+                  )}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        
+        <div className="p-4 bg-slate-50 border-t border-slate-100 text-xs text-slate-400">
+          Menunjukkan {filteredStudents.length} orang pelajar. Semua perubahan disimpan secara automatik.
+        </div>
+      </div>
+    );
+  };
 
-            document.getElementById('user-display').innerText = `${profile.nama} (${profile.role.toUpperCase()})`;
-            showView('main');
+  if (!user) return <LoginPage />;
 
-            if (profile.role === 'admin') {
-                showView('admin');
-                await loadAdminData();
-            } else {
-                showView('guru');
-                await loadGuruData();
-            }
-        }
+  return (
+    <div className="min-h-screen bg-slate-50 font-sans text-slate-900">
+      <Sidebar />
+      <main className="ml-64 p-8">
+        {view === 'dashboard' ? <DashboardHome /> : <MarkahManager />}
+      </main>
+    </div>
+  );
+};
 
-        document.getElementById('login-form').onsubmit = async (e) => {
-            e.preventDefault();
-            const email = document.getElementById('login-email').value;
-            const password = document.getElementById('login-password').value;
-            const errorEl = document.getElementById('login-error');
-
-            showLoading(true);
-            errorEl.classList.add('hidden');
-
-            const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
-
-            if (error) {
-                errorEl.innerText = error.message;
-                errorEl.classList.remove('hidden');
-            } else {
-                await setupUser(data.user);
-            }
-            showLoading(false);
-        };
-
-        async function logout() {
-            await supabaseClient.auth.signOut();
-            window.location.reload();
-        }
-
-        function showView(viewName) {
-            if (viewName === 'login') {
-                document.getElementById('view-login').classList.remove('hidden');
-                document.getElementById('view-main').classList.add('hidden');
-            } else if (viewName === 'main') {
-                document.getElementById('view-login').classList.add('hidden');
-                document.getElementById('view-main').classList.remove('hidden');
-            } else {
-                document.getElementById('view-admin').classList.add('hidden');
-                document.getElementById('view-guru').classList.add('hidden');
-                document.getElementById(`view-${viewName}`).classList.remove('hidden');
-            }
-        }
-
-        // --- DATA FETCHING (ADMIN) ---
-        async function loadAdminData() {
-            showLoading(true);
-            const { data: std } = await supabaseClient.from('students').select('*');
-            const { data: mrk } = await supabaseClient.from('marks').select('*, subjects(nama_subjek)');
-            const { data: sbj } = await supabaseClient.from('subjects').select('*');
-            
-            allStudents = std || [];
-            allMarks = mrk || [];
-            allSubjects = sbj || [];
-
-            renderAdminDashboard();
-            showLoading(false);
-        }
-
-        function renderAdminDashboard() {
-            const table = document.getElementById('admin-table-body');
-            table.innerHTML = '';
-            
-            let totalGpsPoints = 0;
-            let totalMarksEntries = 0;
-            let passCount = 0;
-            let totalGagalSemua = 0;
-
-            const studentStats = allStudents.map(student => {
-                const sMarks = allMarks.filter(m => m.student_id === student.id);
-                const avg = sMarks.length > 0 ? (sMarks.reduce((a, b) => a + b.markah, 0) / sMarks.length) : 0;
-                const gredObj = getGrade(avg);
-                
-                let isGagalSemua = sMarks.length > 0;
-                sMarks.forEach(m => {
-                    const g = getGrade(m.markah);
-                    totalGpsPoints += g.p;
-                    totalMarksEntries++;
-                    if (g.g !== 'E') passCount++;
-                    if (g.g !== 'E') isGagalSemua = false;
-                });
-
-                if (isGagalSemua) totalGagalSemua++;
-
-                return { ...student, avg, gred: gredObj.g, isPass: gredObj.g !== 'E' && gredObj.g !== '-' };
-            });
-
-            studentStats.forEach(s => {
-                const row = `
-                    <tr>
-                        <td class="p-4 font-medium">${s.nama}</td>
-                        <td class="p-4 text-gray-500">${s.kelas}</td>
-                        <td class="p-4">${s.avg.toFixed(1)}</td>
-                        <td class="p-4 font-bold text-blue-600">${s.gred}</td>
-                        <td class="p-4">
-                            <span class="px-2 py-1 rounded-full text-xs font-bold ${s.isPass ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}">
-                                ${s.isPass ? 'LULUS' : 'GAGAL'}
-                            </span>
-                        </td>
-                    </tr>
-                `;
-                table.innerHTML += row;
-            });
-
-            document.getElementById('admin-murid').innerText = allStudents.length;
-            document.getElementById('admin-gps').innerText = totalMarksEntries > 0 ? (totalGpsPoints / totalMarksEntries).toFixed(2) : "0.00";
-            document.getElementById('admin-lulus').innerText = totalMarksEntries > 0 ? ((passCount / totalMarksEntries) * 100).toFixed(0) + "%" : "0%";
-            document.getElementById('admin-gagal').innerText = totalGagalSemua;
-
-            renderCharts(studentStats);
-        }
-
-        // --- DATA FETCHING (GURU) ---
-        async function loadGuruData() {
-            showLoading(true);
-            document.getElementById('guru-info').innerText = `Subjek: ${profile.subjek || 'Belum Tetap'} | Kelas: ${profile.kelas || 'Semua'}`;
-            
-            const { data: std } = await supabaseClient.from('students').select('*');
-            const { data: mrk } = await supabaseClient.from('marks').select('*').eq('user_id', currentUser.id);
-            
-            allStudents = std || [];
-            allMarks = mrk || [];
-
-            const kelasList = [...new Set(allStudents.map(s => s.kelas))];
-            const filterKelas = document.getElementById('filter-kelas');
-            filterKelas.innerHTML = '<option value="">Semua Kelas</option>';
-            kelasList.forEach(k => filterKelas.innerHTML += `<option value="${k}">${k}</option>`);
-
-            filterGuruTable();
-            showLoading(false);
-        }
-
-        function filterGuruTable() {
-            const selectedKelas = document.getElementById('filter-kelas').value;
-            let filtered = allStudents;
-            if (profile.kelas) filtered = filtered.filter(s => s.kelas === profile.kelas);
-            if (selectedKelas) filtered = filtered.filter(s => s.kelas === selectedKelas);
-
-            const table = document.getElementById('guru-table-body');
-            table.innerHTML = '';
-
-            filtered.forEach(s => {
-                const markObj = allMarks.find(m => m.student_id === s.id);
-                const markVal = markObj ? markObj.markah : '-';
-                const gred = getGrade(markVal).g;
-                
-                table.innerHTML += `
-                    <tr class="hover:bg-gray-50">
-                        <td class="p-4 font-medium">${s.nama}</td>
-                        <td class="p-4 text-gray-500">${s.kelas}</td>
-                        <td class="p-4 ${markVal !== '-' && markVal < 40 ? 'text-red-600 font-bold' : ''}">${markVal}</td>
-                        <td class="p-4 font-bold text-blue-600">${gred}</td>
-                        <td class="p-4">
-                            <button onclick="openMarkModal(${s.id}, '${s.nama}', ${markVal !== '-' ? markVal : 'null'})" 
-                                class="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700">
-                                Isi Markah
-                            </button>
-                        </td>
-                    </tr>
-                `;
-            });
-        }
-
-        function openMarkModal(id, name, currentMark) {
-            document.getElementById('modal-student-id').value = id;
-            document.getElementById('modal-title').innerText = `Markah: ${name}`;
-            document.getElementById('modal-mark-input').value = currentMark === null ? '' : currentMark;
-            document.getElementById('modal-mark').classList.remove('hidden');
-        }
-
-        function closeModal() {
-            document.getElementById('modal-mark').classList.add('hidden');
-        }
-
-        document.getElementById('mark-form').onsubmit = async (e) => {
-            e.preventDefault();
-            const studentId = document.getElementById('modal-student-id').value;
-            const markah = document.getElementById('modal-mark-input').value;
-            
-            showLoading(true);
-            // Ambil ID subjek berdasarkan nama subjek guru
-            const { data: subData } = await supabaseClient.from('subjects').select('id').eq('nama_subjek', profile.subjek).maybeSingle();
-            
-            if (!subData) {
-                alert("Subjek anda (" + profile.subjek + ") tidak ditemui dalam senarai subjek. Sila hubungi Admin.");
-                showLoading(false);
-                return;
-            }
-
-            const { error } = await supabaseClient
-                .from('marks')
-                .upsert({
-                    student_id: studentId,
-                    subject_id: subData.id,
-                    markah: parseInt(markah),
-                    user_id: currentUser.id,
-                    ujian: 'UPSA 2026'
-                });
-
-            if (error) {
-                alert("Gagal menyimpan: " + error.message);
-            } else {
-                closeModal();
-                await loadGuruData();
-            }
-            showLoading(false);
-        };
-
-        let barChart = null;
-        let pieChart = null;
-
-        function renderCharts(studentStats) {
-            const ctxBar = document.getElementById('chart-admin-bar').getContext('2d');
-            const ctxPie = document.getElementById('chart-admin-pie').getContext('2d');
-
-            if (barChart) barChart.destroy();
-            if (pieChart) pieChart.destroy();
-
-            const gredCounts = { 'A': 0, 'B': 0, 'C': 0, 'D': 0, 'E': 0 };
-            allMarks.forEach(m => {
-                const g = getGrade(m.markah).g;
-                if (gredCounts[g] !== undefined) gredCounts[g]++;
-            });
-
-            pieChart = new Chart(ctxPie, {
-                type: 'pie',
-                data: {
-                    labels: Object.keys(gredCounts),
-                    datasets: [{
-                        data: Object.values(gredCounts),
-                        backgroundColor: ['#2563eb', '#3b82f6', '#60a5fa', '#93c5fd', '#ef4444']
-                    }]
-                }
-            });
-
-            const subAvgs = {};
-            allSubjects.forEach(s => {
-                const marksForSub = allMarks.filter(m => m.subject_id === s.id);
-                const avg = marksForSub.length > 0 ? (marksForSub.reduce((a, b) => a + b.markah, 0) / marksForSub.length) : 0;
-                subAvgs[s.nama_subjek] = avg;
-            });
-
-            barChart = new Chart(ctxBar, {
-                type: 'bar',
-                data: {
-                    labels: Object.keys(subAvgs),
-                    datasets: [{
-                        label: 'Purata Markah',
-                        data: Object.values(subAvgs),
-                        backgroundColor: '#2563eb'
-                    }]
-                },
-                options: { scales: { y: { beginAtZero: true, max: 100 } } }
-            });
-        }
-
-        function exportToPDF() {
-            const { jsPDF } = window.jspdf;
-            const doc = new jsPDF();
-            doc.text("Laporan Keseluruhan UPSA 2026", 14, 15);
-            const tableData = [];
-            document.querySelectorAll("#admin-table-body tr").forEach(row => {
-                const rowData = [];
-                row.querySelectorAll("td").forEach(cell => rowData.push(cell.innerText));
-                tableData.push(rowData);
-            });
-            doc.autoTable({
-                startY: 20,
-                head: [['Nama', 'Kelas', 'Purata', 'Gred', 'Status']],
-                body: tableData,
-            });
-            doc.save("Laporan_UPSA_2026.pdf");
-        }
-
-        window.onload = initAuth;
-    </script>
-</body>
-</html>
+export default App;
