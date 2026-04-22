@@ -226,54 +226,96 @@
             }
         }
 
-        async function setupUser(user) {
-            currentUser = user;
-            const { data, error } = await supabaseClient
-                .from('profiles')
-                .select('*')
-                .eq('id', user.id)
-                .single();
-            
-            if (data) {
-                profile = data;
-                document.getElementById('user-display').innerText = `${profile.nama} (${profile.role})`;
-                showView('main');
-                if (profile.role === 'admin') {
-                    showView('admin');
-                    loadAdminData();
-                } else {
-                    showView('guru');
-                    loadGuruData();
-                }
-            } else {
-                logout();
-            }
+       async function setupUser(user) {
+    console.log("USER LOGIN:", user);
+
+    currentUser = user;
+
+    const { data, error } = await supabaseClient
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .maybeSingle(); // 🔥 penting (tak error kalau kosong)
+
+    console.log("PROFILE:", data);
+    console.log("ERROR:", error);
+
+    // ✅ Kalau profile tak wujud → auto create
+    if (!data) {
+        console.log("Profile tak jumpa → create baru");
+
+        const { data: newProfile, error: insertError } = await supabaseClient
+            .from('profiles')
+            .insert({
+                id: user.id,
+                nama: user.email,
+                role: 'guru'
+            })
+            .select()
+            .single();
+
+        if (insertError) {
+            alert("Gagal create profile: " + insertError.message);
+            return;
         }
 
-        document.getElementById('login-form').onsubmit = async (e) => {
-            e.preventDefault();
-            const email = document.getElementById('login-email').value;
-            const password = document.getElementById('login-password').value;
-            const errorEl = document.getElementById('login-error');
-            
-            showLoading(true);
-            errorEl.classList.add('hidden');
+        profile = newProfile;
+    } else {
+        profile = data;
+    }
 
-            try {
-                const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
-                if (error) {
-                    errorEl.innerText = error.message;
-                    errorEl.classList.remove('hidden');
-                } else {
-                    await setupUser(data.user);
-                }
-            } catch (err) {
-                errorEl.innerText = "Ralat sistem. Cuba lagi.";
+    // ✅ Papar user
+    document.getElementById('user-display').innerText =
+        `${profile.nama} (${profile.role})`;
+
+    // ✅ Masuk sistem
+    showView('main');
+
+    // ✅ Redirect ikut role
+    if (profile.role === 'admin') {
+        showView('admin');
+        loadAdminData();
+    } else {
+        showView('guru');
+        loadGuruData();
+    }
+}
+        document.getElementById('login-form').onsubmit = async (e) => {
+    e.preventDefault();
+
+    const email = document.getElementById('login-email').value;
+    const password = document.getElementById('login-password').value;
+    const errorEl = document.getElementById('login-error');
+
+    showLoading(true);
+    errorEl.classList.add('hidden');
+
+    try {
+        const { data, error } = await supabaseClient.auth.signInWithPassword({
+            email,
+            password
+        });
+
+        if (error) {
+            errorEl.innerText = error.message;
+            errorEl.classList.remove('hidden');
+        } else {
+            if (!data.user) {
+                errorEl.innerText = "Login gagal (tiada user)";
                 errorEl.classList.remove('hidden');
-            } finally {
-                showLoading(false);
+                return;
             }
-        };
+
+            await setupUser(data.user);
+        }
+    } catch (err) {
+        console.error(err);
+        errorEl.innerText = "Ralat sistem";
+        errorEl.classList.remove('hidden');
+    }
+
+    showLoading(false);
+};
 
         async function logout() {
             await supabaseClient.auth.signOut();
