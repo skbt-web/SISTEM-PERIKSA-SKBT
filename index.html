@@ -130,7 +130,7 @@
                     <p id="guru-info" class="text-gray-500"></p>
                 </div>
                 <div class="mt-4 md:mt-0 flex space-x-2">
-                    <select id="filter-kelas" class="border p-2 rounded-lg text-sm bg-white">
+                    <select id="filter-kelas" class="border p-2 rounded-lg text-sm bg-white" onchange="filterGuruTable()">
                         <option value="">Semua Kelas</option>
                     </select>
                 </div>
@@ -182,7 +182,6 @@
         const SUPABASE_URL = "https://obqdnbamhaimbbehsssg.supabase.co"; 
         const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9icWRuYmFtaGFpbWJiZWhzc3NnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY4NjEyMTEsImV4cCI6MjA5MjQzNzIxMX0.va25HWu-66e6lBXMH5paskb6wAaZLGZPLEBKHfpfyQs"; 
         
-        // Inisialisasi client - Membetulkan ralat "already declared"
         const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
         // --- STATE PENGGUNA ---
@@ -194,7 +193,7 @@
 
         // --- LOGIK GRED ---
         const getGrade = (m) => {
-            if (m === null || m === undefined || m === '-') return { g: '-', p: 0 };
+            if (m === null || m === undefined || m === '-' || m === '') return { g: '-', p: 0 };
             const val = parseFloat(m);
             if (val >= 85) return { g: 'A', p: 1 };
             if (val >= 70) return { g: 'B', p: 2 };
@@ -204,15 +203,14 @@
         };
 
         const showLoading = (show) => {
-            const overlay = document.getElementById('loading');
-            overlay.style.display = show ? 'flex' : 'none';
+            document.getElementById('loading').style.display = show ? 'flex' : 'none';
         };
 
         // --- AUTH ---
         async function initAuth() {
             showLoading(true);
             try {
-                const { data: { session }, error } = await supabaseClient.auth.getSession();
+                const { data: { session } } = await supabaseClient.auth.getSession();
                 if (session) {
                     await setupUser(session.user);
                 } else {
@@ -226,110 +224,87 @@
             }
         }
 
-       async function setupUser(user) {
-    console.log("USER LOGIN:", user);
+        async function setupUser(user) {
+            currentUser = user;
+            
+            // Ambil profil
+            const { data, error } = await supabaseClient
+                .from('profiles')
+                .select('*')
+                .eq('id', user.id)
+                .maybeSingle();
 
-    currentUser = user;
-
-    const { data, error } = await supabaseClient
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
-        .maybeSingle(); // 🔥 penting (tak error kalau kosong)
-
-    console.log("PROFILE:", data);
-    console.log("ERROR:", error);
-
-    // ✅ Kalau profile tak wujud → auto create
-    if (!data) {
-        console.log("Profile tak jumpa → create baru");
-
-        const { data: newProfile, error: insertError } = await supabaseClient
-            .from('profiles')
-            .insert({
-                id: user.id,
-                nama: user.email,
-                role: 'guru'
-            })
-            .select()
-            .single();
-
-        if (insertError) {
-            alert("Gagal create profile: " + insertError.message);
-            return;
-        }
-
-        profile = newProfile;
-    } else {
-        profile = data;
-    }
-
-    // ✅ Papar user
-    document.getElementById('user-display').innerText =
-        `${profile.nama} (${profile.role})`;
-
-    // ✅ Masuk sistem
-    showView('main');
-
-    // ✅ Redirect ikut role
-    if (profile.role === 'admin') {
-        showView('admin');
-        loadAdminData();
-    } else {
-        showView('guru');
-        loadGuruData();
-    }
-}
-        document.getElementById('login-form').onsubmit = async (e) => {
-    e.preventDefault();
-
-    const email = document.getElementById('login-email').value;
-    const password = document.getElementById('login-password').value;
-    const errorEl = document.getElementById('login-error');
-
-    showLoading(true);
-    errorEl.classList.add('hidden');
-
-    try {
-        const { data, error } = await supabaseClient.auth.signInWithPassword({
-            email,
-            password
-        });
-
-        if (error) {
-            errorEl.innerText = error.message;
-            errorEl.classList.remove('hidden');
-        } else {
-            if (!data.user) {
-                errorEl.innerText = "Login gagal (tiada user)";
-                errorEl.classList.remove('hidden');
-                return;
+            if (!data) {
+                // Jika profil tiada, cuba ambil peranan dari metadata atau default 'guru'
+                const userRole = user.user_metadata?.role || 'guru';
+                const { data: newProfile, error: insErr } = await supabaseClient
+                    .from('profiles')
+                    .insert({
+                        id: user.id,
+                        nama: user.user_metadata?.nama || user.email,
+                        role: userRole
+                    })
+                    .select()
+                    .single();
+                
+                if (insErr) {
+                    console.error("Error creating profile:", insErr);
+                    return;
+                }
+                profile = newProfile;
+            } else {
+                profile = data;
             }
 
-            await setupUser(data.user);
-        }
-    } catch (err) {
-        console.error(err);
-        errorEl.innerText = "Ralat sistem";
-        errorEl.classList.remove('hidden');
-    }
+            document.getElementById('user-display').innerText = `${profile.nama} (${profile.role.toUpperCase()})`;
+            showView('main');
 
-    showLoading(false);
-};
+            if (profile.role === 'admin') {
+                showView('admin');
+                await loadAdminData();
+            } else {
+                showView('guru');
+                await loadGuruData();
+            }
+        }
+
+        document.getElementById('login-form').onsubmit = async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('login-email').value;
+            const password = document.getElementById('login-password').value;
+            const errorEl = document.getElementById('login-error');
+
+            showLoading(true);
+            errorEl.classList.add('hidden');
+
+            const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
+
+            if (error) {
+                errorEl.innerText = error.message;
+                errorEl.classList.remove('hidden');
+            } else {
+                await setupUser(data.user);
+            }
+            showLoading(false);
+        };
 
         async function logout() {
             await supabaseClient.auth.signOut();
             window.location.reload();
         }
 
-        // --- ROUTING ---
         function showView(viewName) {
-            const views = ['login', 'main', 'admin', 'guru'];
-            views.forEach(v => {
-                const el = document.getElementById(`view-${v}`);
-                if (el) el.classList.add('hidden');
-            });
-            document.getElementById(`view-${viewName}`).classList.remove('hidden');
+            if (viewName === 'login') {
+                document.getElementById('view-login').classList.remove('hidden');
+                document.getElementById('view-main').classList.add('hidden');
+            } else if (viewName === 'main') {
+                document.getElementById('view-login').classList.add('hidden');
+                document.getElementById('view-main').classList.remove('hidden');
+            } else {
+                document.getElementById('view-admin').classList.add('hidden');
+                document.getElementById('view-guru').classList.add('hidden');
+                document.getElementById(`view-${viewName}`).classList.remove('hidden');
+            }
         }
 
         // --- DATA FETCHING (ADMIN) ---
@@ -352,22 +327,25 @@
             table.innerHTML = '';
             
             let totalGpsPoints = 0;
-            let totalSubjectsCount = 0;
+            let totalMarksEntries = 0;
             let passCount = 0;
+            let totalGagalSemua = 0;
 
             const studentStats = allStudents.map(student => {
                 const sMarks = allMarks.filter(m => m.student_id === student.id);
                 const avg = sMarks.length > 0 ? (sMarks.reduce((a, b) => a + b.markah, 0) / sMarks.length) : 0;
                 const gredObj = getGrade(avg);
                 
-                if (sMarks.length > 0) {
-                    sMarks.forEach(m => {
-                        const g = getGrade(m.markah);
-                        totalGpsPoints += g.p;
-                        totalSubjectsCount++;
-                        if (g.g !== 'E' && g.g !== '-') passCount++;
-                    });
-                }
+                let isGagalSemua = sMarks.length > 0;
+                sMarks.forEach(m => {
+                    const g = getGrade(m.markah);
+                    totalGpsPoints += g.p;
+                    totalMarksEntries++;
+                    if (g.g !== 'E') passCount++;
+                    if (g.g !== 'E') isGagalSemua = false;
+                });
+
+                if (isGagalSemua) totalGagalSemua++;
 
                 return { ...student, avg, gred: gredObj.g, isPass: gredObj.g !== 'E' && gredObj.g !== '-' };
             });
@@ -390,8 +368,9 @@
             });
 
             document.getElementById('admin-murid').innerText = allStudents.length;
-            document.getElementById('admin-gps').innerText = totalSubjectsCount > 0 ? (totalGpsPoints / totalSubjectsCount).toFixed(2) : "0.00";
-            document.getElementById('admin-lulus').innerText = totalSubjectsCount > 0 ? ((passCount / totalSubjectsCount) * 100).toFixed(0) + "%" : "0%";
+            document.getElementById('admin-gps').innerText = totalMarksEntries > 0 ? (totalGpsPoints / totalMarksEntries).toFixed(2) : "0.00";
+            document.getElementById('admin-lulus').innerText = totalMarksEntries > 0 ? ((passCount / totalMarksEntries) * 100).toFixed(0) + "%" : "0%";
+            document.getElementById('admin-gagal').innerText = totalGagalSemua;
 
             renderCharts(studentStats);
         }
@@ -399,39 +378,42 @@
         // --- DATA FETCHING (GURU) ---
         async function loadGuruData() {
             showLoading(true);
-            document.getElementById('guru-info').innerText = `Subjek: ${profile.subjek || 'N/A'} | Kelas: ${profile.kelas || 'Semua'}`;
+            document.getElementById('guru-info').innerText = `Subjek: ${profile.subjek || 'Belum Tetap'} | Kelas: ${profile.kelas || 'Semua'}`;
             
             const { data: std } = await supabaseClient.from('students').select('*');
             const { data: mrk } = await supabaseClient.from('marks').select('*').eq('user_id', currentUser.id);
             
-            let filteredStudents = std || [];
-            if (profile.kelas) {
-                filteredStudents = filteredStudents.filter(s => s.kelas === profile.kelas);
-            }
+            allStudents = std || [];
+            allMarks = mrk || [];
 
-            const kelasList = [...new Set((std || []).map(s => s.kelas))];
+            const kelasList = [...new Set(allStudents.map(s => s.kelas))];
             const filterKelas = document.getElementById('filter-kelas');
             filterKelas.innerHTML = '<option value="">Semua Kelas</option>';
             kelasList.forEach(k => filterKelas.innerHTML += `<option value="${k}">${k}</option>`);
 
-            renderGuruTable(filteredStudents, mrk || []);
+            filterGuruTable();
             showLoading(false);
         }
 
-        function renderGuruTable(students, marks) {
+        function filterGuruTable() {
+            const selectedKelas = document.getElementById('filter-kelas').value;
+            let filtered = allStudents;
+            if (profile.kelas) filtered = filtered.filter(s => s.kelas === profile.kelas);
+            if (selectedKelas) filtered = filtered.filter(s => s.kelas === selectedKelas);
+
             const table = document.getElementById('guru-table-body');
             table.innerHTML = '';
 
-            students.forEach(s => {
-                const markObj = marks.find(m => m.student_id === s.id);
+            filtered.forEach(s => {
+                const markObj = allMarks.find(m => m.student_id === s.id);
                 const markVal = markObj ? markObj.markah : '-';
                 const gred = getGrade(markVal).g;
                 
-                const row = `
+                table.innerHTML += `
                     <tr class="hover:bg-gray-50">
                         <td class="p-4 font-medium">${s.nama}</td>
                         <td class="p-4 text-gray-500">${s.kelas}</td>
-                        <td class="p-4 ${markVal !== '-' && markVal < 50 ? 'text-red-600 font-bold' : ''}">${markVal}</td>
+                        <td class="p-4 ${markVal !== '-' && markVal < 40 ? 'text-red-600 font-bold' : ''}">${markVal}</td>
                         <td class="p-4 font-bold text-blue-600">${gred}</td>
                         <td class="p-4">
                             <button onclick="openMarkModal(${s.id}, '${s.nama}', ${markVal !== '-' ? markVal : 'null'})" 
@@ -441,14 +423,13 @@
                         </td>
                     </tr>
                 `;
-                table.innerHTML += row;
             });
         }
 
         function openMarkModal(id, name, currentMark) {
             document.getElementById('modal-student-id').value = id;
             document.getElementById('modal-title').innerText = `Markah: ${name}`;
-            document.getElementById('modal-mark-input').value = (currentMark === null || isNaN(currentMark)) ? '' : currentMark;
+            document.getElementById('modal-mark-input').value = currentMark === null ? '' : currentMark;
             document.getElementById('modal-mark').classList.remove('hidden');
         }
 
@@ -462,11 +443,11 @@
             const markah = document.getElementById('modal-mark-input').value;
             
             showLoading(true);
-
-            const { data: subData } = await supabaseClient.from('subjects').select('id').eq('nama_subjek', profile.subjek).single();
+            // Ambil ID subjek berdasarkan nama subjek guru
+            const { data: subData } = await supabaseClient.from('subjects').select('id').eq('nama_subjek', profile.subjek).maybeSingle();
             
             if (!subData) {
-                alert("Subjek anda tidak ditemui. Sila hubungi Admin.");
+                alert("Subjek anda (" + profile.subjek + ") tidak ditemui dalam senarai subjek. Sila hubungi Admin.");
                 showLoading(false);
                 return;
             }
@@ -479,13 +460,13 @@
                     markah: parseInt(markah),
                     user_id: currentUser.id,
                     ujian: 'UPSA 2026'
-                }, { onConflict: 'student_id,subject_id' });
+                });
 
             if (error) {
                 alert("Gagal menyimpan: " + error.message);
             } else {
                 closeModal();
-                loadGuruData();
+                await loadGuruData();
             }
             showLoading(false);
         };
