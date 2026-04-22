@@ -14,7 +14,7 @@
             display: none;
             position: fixed;
             top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(255,255,255,0.8);
+            background: rgba(255,255,255,0.9);
             z-index: 9999; justify-content: center; align-items: center;
         }
         .active-view { display: block !important; }
@@ -22,12 +22,13 @@
 </head>
 <body class="bg-gray-50 font-sans text-gray-900">
 
+    <!-- Elemen Memuatkan (Loading) -->
     <div id="loading" class="loading-overlay flex flex-col">
         <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-        <p class="mt-4 text-gray-600">Memuatkan...</p>
+        <p class="mt-4 text-gray-600 font-medium">Memuatkan...</p>
     </div>
 
-    <!-- Login Screen -->
+    <!-- Paparan Log Masuk -->
     <div id="view-login" class="min-h-screen flex items-center justify-center bg-blue-600 px-4">
         <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-md">
             <h2 class="text-3xl font-bold text-center text-blue-800 mb-2">UPSA 2026</h2>
@@ -42,23 +43,20 @@
                     <label class="block text-sm font-medium text-gray-700">Kata Laluan</label>
                     <input type="password" id="login-password" class="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" required placeholder="••••••••">
                 </div>
-                <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg transition-colors">Log Masuk</button>
+                <button type="submit" id="btn-login" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg transition-colors">Log Masuk</button>
             </form>
             <p id="login-error" class="text-red-500 text-sm mt-4 text-center hidden"></p>
         </div>
     </div>
 
-    <!-- Main Dashboard Shell -->
+    <!-- Utama Dashboard Shell -->
     <div id="view-main" class="hidden min-h-screen flex flex-col">
-        <!-- Navigation -->
+        <!-- Navigasi -->
         <nav class="bg-white border-b sticky top-0 z-50">
             <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div class="flex justify-between h-16">
                     <div class="flex items-center">
                         <span class="text-xl font-bold text-blue-700">UPSA 2026</span>
-                        <div id="nav-links" class="ml-10 flex space-x-4">
-                            <!-- Dynamic links based on role -->
-                        </div>
                     </div>
                     <div class="flex items-center space-x-4">
                         <span id="user-display" class="text-sm font-medium text-gray-600"></span>
@@ -68,7 +66,7 @@
             </div>
         </nav>
 
-        <!-- Admin Dashboard -->
+        <!-- Dashboard Admin -->
         <main id="view-admin" class="hidden flex-1 p-6 max-w-7xl mx-auto w-full">
             <h1 class="text-2xl font-bold mb-6">Panel Pentadbir (Admin)</h1>
             
@@ -124,7 +122,7 @@
             </div>
         </main>
 
-        <!-- Guru Dashboard -->
+        <!-- Dashboard Guru -->
         <main id="view-guru" class="hidden flex-1 p-6 max-w-7xl mx-auto w-full">
             <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6">
                 <div>
@@ -161,7 +159,7 @@
         </main>
     </div>
 
-    <!-- Mark Input Modal -->
+    <!-- Modal Input Markah -->
     <div id="modal-mark" class="hidden fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-4">
         <div class="bg-white rounded-2xl w-full max-w-md p-6 shadow-2xl">
             <h3 id="modal-title" class="text-xl font-bold mb-4">Input Markah</h3>
@@ -181,10 +179,11 @@
 
     <script>
         // --- KONFIGURASI SUPABASE ---
-        // Sila gantikan URL dan KEY anda di sini
-        const SUPABASE_URL = "https://obqdnbamhaimbbehsssg.supabase.co/rest/v1/"; 
+        const SUPABASE_URL = "https://obqdnbamhaimbbehsssg.supabase.co"; 
         const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9icWRuYmFtaGFpbWJiZWhzc3NnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY4NjEyMTEsImV4cCI6MjA5MjQzNzIxMX0.va25HWu-66e6lBXMH5paskb6wAaZLGZPLEBKHfpfyQs"; 
-        const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+        
+        // Inisialisasi client - Membetulkan ralat "already declared"
+        const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
         // --- STATE PENGGUNA ---
         let currentUser = null;
@@ -192,35 +191,44 @@
         let allStudents = [];
         let allMarks = [];
         let allSubjects = [];
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'sk-upsa-2026';
 
         // --- LOGIK GRED ---
         const getGrade = (m) => {
-            if (m === null || m === undefined) return '-';
-            if (m >= 85) return { g: 'A', p: 1 };
-            if (m >= 70) return { g: 'B', p: 2 };
-            if (m >= 60) return { g: 'C', p: 3 };
-            if (m >= 50) return { g: 'D', p: 4 };
+            if (m === null || m === undefined || m === '-') return { g: '-', p: 0 };
+            const val = parseFloat(m);
+            if (val >= 85) return { g: 'A', p: 1 };
+            if (val >= 70) return { g: 'B', p: 2 };
+            if (val >= 60) return { g: 'C', p: 3 };
+            if (val >= 50) return { g: 'D', p: 4 };
             return { g: 'E', p: 5 };
         };
 
-        const showLoading = (show) => document.getElementById('loading').style.display = show ? 'flex' : 'none';
+        const showLoading = (show) => {
+            const overlay = document.getElementById('loading');
+            overlay.style.display = show ? 'flex' : 'none';
+        };
 
         // --- AUTH ---
         async function initAuth() {
             showLoading(true);
-            const { data: { session } } = await supabase.auth.getSession();
-            if (session) {
-                await setupUser(session.user);
-            } else {
+            try {
+                const { data: { session }, error } = await supabaseClient.auth.getSession();
+                if (session) {
+                    await setupUser(session.user);
+                } else {
+                    showView('login');
+                }
+            } catch (err) {
+                console.error("Auth Error:", err);
                 showView('login');
+            } finally {
+                showLoading(false);
             }
-            showLoading(false);
         }
 
         async function setupUser(user) {
             currentUser = user;
-            const { data, error } = await supabase
+            const { data, error } = await supabaseClient
                 .from('profiles')
                 .select('*')
                 .eq('id', user.id)
@@ -237,6 +245,8 @@
                     showView('guru');
                     loadGuruData();
                 }
+            } else {
+                logout();
             }
         }
 
@@ -247,18 +257,26 @@
             const errorEl = document.getElementById('login-error');
             
             showLoading(true);
-            const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-            if (error) {
-                errorEl.innerText = error.message;
+            errorEl.classList.add('hidden');
+
+            try {
+                const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
+                if (error) {
+                    errorEl.innerText = error.message;
+                    errorEl.classList.remove('hidden');
+                } else {
+                    await setupUser(data.user);
+                }
+            } catch (err) {
+                errorEl.innerText = "Ralat sistem. Cuba lagi.";
                 errorEl.classList.remove('hidden');
-            } else {
-                await setupUser(data.user);
+            } finally {
+                showLoading(false);
             }
-            showLoading(false);
         };
 
         async function logout() {
-            await supabase.auth.signOut();
+            await supabaseClient.auth.signOut();
             window.location.reload();
         }
 
@@ -275,9 +293,9 @@
         // --- DATA FETCHING (ADMIN) ---
         async function loadAdminData() {
             showLoading(true);
-            const { data: std } = await supabase.from('students').select('*');
-            const { data: mrk } = await supabase.from('marks').select('*, subjects(nama_subjek)');
-            const { data: sbj } = await supabase.from('subjects').select('*');
+            const { data: std } = await supabaseClient.from('students').select('*');
+            const { data: mrk } = await supabaseClient.from('marks').select('*, subjects(nama_subjek)');
+            const { data: sbj } = await supabaseClient.from('subjects').select('*');
             
             allStudents = std || [];
             allMarks = mrk || [];
@@ -294,24 +312,22 @@
             let totalGpsPoints = 0;
             let totalSubjectsCount = 0;
             let passCount = 0;
-            let totalStudentsWithMarks = 0;
 
             const studentStats = allStudents.map(student => {
                 const sMarks = allMarks.filter(m => m.student_id === student.id);
                 const avg = sMarks.length > 0 ? (sMarks.reduce((a, b) => a + b.markah, 0) / sMarks.length) : 0;
-                const gred = getGrade(avg);
+                const gredObj = getGrade(avg);
                 
                 if (sMarks.length > 0) {
-                    totalStudentsWithMarks++;
                     sMarks.forEach(m => {
                         const g = getGrade(m.markah);
                         totalGpsPoints += g.p;
                         totalSubjectsCount++;
-                        if (g.g !== 'E') passCount++;
+                        if (g.g !== 'E' && g.g !== '-') passCount++;
                     });
                 }
 
-                return { ...student, avg, gred: gred.g, isPass: gred.g !== 'E' };
+                return { ...student, avg, gred: gredObj.g, isPass: gredObj.g !== 'E' && gredObj.g !== '-' };
             });
 
             studentStats.forEach(s => {
@@ -331,7 +347,6 @@
                 table.innerHTML += row;
             });
 
-            // Update KPI
             document.getElementById('admin-murid').innerText = allStudents.length;
             document.getElementById('admin-gps').innerText = totalSubjectsCount > 0 ? (totalGpsPoints / totalSubjectsCount).toFixed(2) : "0.00";
             document.getElementById('admin-lulus').innerText = totalSubjectsCount > 0 ? ((passCount / totalSubjectsCount) * 100).toFixed(0) + "%" : "0%";
@@ -342,34 +357,33 @@
         // --- DATA FETCHING (GURU) ---
         async function loadGuruData() {
             showLoading(true);
-            document.getElementById('guru-info').innerText = `Subjek: ${profile.subjek || 'Tidak Ditetapkan'} | Kelas: ${profile.kelas || 'Semua'}`;
+            document.getElementById('guru-info').innerText = `Subjek: ${profile.subjek || 'N/A'} | Kelas: ${profile.kelas || 'Semua'}`;
             
-            const { data: std } = await supabase.from('students').select('*');
-            const { data: mrk } = await supabase.from('marks').select('*').eq('user_id', currentUser.id);
-            const { data: sbj } = await supabase.from('subjects').select('*').eq('nama_subjek', profile.subjek).single();
+            const { data: std } = await supabaseClient.from('students').select('*');
+            const { data: mrk } = await supabaseClient.from('marks').select('*').eq('user_id', currentUser.id);
             
             let filteredStudents = std || [];
             if (profile.kelas) {
                 filteredStudents = filteredStudents.filter(s => s.kelas === profile.kelas);
             }
 
-            const kelasList = [...new Set(std.map(s => s.kelas))];
+            const kelasList = [...new Set((std || []).map(s => s.kelas))];
             const filterKelas = document.getElementById('filter-kelas');
             filterKelas.innerHTML = '<option value="">Semua Kelas</option>';
             kelasList.forEach(k => filterKelas.innerHTML += `<option value="${k}">${k}</option>`);
 
-            renderGuruTable(filteredStudents, mrk, sbj);
+            renderGuruTable(filteredStudents, mrk || []);
             showLoading(false);
         }
 
-        function renderGuruTable(students, marks, subject) {
+        function renderGuruTable(students, marks) {
             const table = document.getElementById('guru-table-body');
             table.innerHTML = '';
 
             students.forEach(s => {
                 const markObj = marks.find(m => m.student_id === s.id);
                 const markVal = markObj ? markObj.markah : '-';
-                const gred = markObj ? getGrade(markVal).g : '-';
+                const gred = getGrade(markVal).g;
                 
                 const row = `
                     <tr class="hover:bg-gray-50">
@@ -389,11 +403,10 @@
             });
         }
 
-        // --- MODAL HANDLING ---
         function openMarkModal(id, name, currentMark) {
             document.getElementById('modal-student-id').value = id;
             document.getElementById('modal-title').innerText = `Markah: ${name}`;
-            document.getElementById('modal-mark-input').value = currentMark === null ? '' : currentMark;
+            document.getElementById('modal-mark-input').value = (currentMark === null || isNaN(currentMark)) ? '' : currentMark;
             document.getElementById('modal-mark').classList.remove('hidden');
         }
 
@@ -408,16 +421,15 @@
             
             showLoading(true);
 
-            // Get current subject ID for the teacher
-            const { data: subData } = await supabase.from('subjects').select('id').eq('nama_subjek', profile.subjek).single();
+            const { data: subData } = await supabaseClient.from('subjects').select('id').eq('nama_subjek', profile.subjek).single();
             
             if (!subData) {
-                alert("Subjek anda tidak sah dalam pangkalan data. Sila hubungi Admin.");
+                alert("Subjek anda tidak ditemui. Sila hubungi Admin.");
                 showLoading(false);
                 return;
             }
 
-            const { error } = await supabase
+            const { error } = await supabaseClient
                 .from('marks')
                 .upsert({
                     student_id: studentId,
@@ -425,11 +437,10 @@
                     markah: parseInt(markah),
                     user_id: currentUser.id,
                     ujian: 'UPSA 2026'
-                }, { onConflict: 'student_id,subject_id' }); // Note: Ensure unique constraint in SQL for this to work perfectly
+                }, { onConflict: 'student_id,subject_id' });
 
             if (error) {
-                console.error(error);
-                alert("Ralat menyimpan markah.");
+                alert("Gagal menyimpan: " + error.message);
             } else {
                 closeModal();
                 loadGuruData();
@@ -437,7 +448,6 @@
             showLoading(false);
         };
 
-        // --- ANALYTICS / CHARTS ---
         let barChart = null;
         let pieChart = null;
 
@@ -448,7 +458,6 @@
             if (barChart) barChart.destroy();
             if (pieChart) pieChart.destroy();
 
-            // Logic for Agihan Gred
             const gredCounts = { 'A': 0, 'B': 0, 'C': 0, 'D': 0, 'E': 0 };
             allMarks.forEach(m => {
                 const g = getGrade(m.markah).g;
@@ -466,7 +475,6 @@
                 }
             });
 
-            // Logic for Average per Subject
             const subAvgs = {};
             allSubjects.forEach(s => {
                 const marksForSub = allMarks.filter(m => m.subject_id === s.id);
@@ -488,30 +496,24 @@
             });
         }
 
-        // --- EXPORT PDF ---
         function exportToPDF() {
             const { jsPDF } = window.jspdf;
             const doc = new jsPDF();
-            
             doc.text("Laporan Keseluruhan UPSA 2026", 14, 15);
-            
             const tableData = [];
             document.querySelectorAll("#admin-table-body tr").forEach(row => {
                 const rowData = [];
                 row.querySelectorAll("td").forEach(cell => rowData.push(cell.innerText));
                 tableData.push(rowData);
             });
-
             doc.autoTable({
                 startY: 20,
                 head: [['Nama', 'Kelas', 'Purata', 'Gred', 'Status']],
                 body: tableData,
             });
-
             doc.save("Laporan_UPSA_2026.pdf");
         }
 
-        // Initialize on load
         window.onload = initAuth;
     </script>
 </body>
