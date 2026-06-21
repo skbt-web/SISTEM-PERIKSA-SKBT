@@ -477,6 +477,8 @@
         let slipUlasanGuruKelas = 'Seorang murid yang rajin dan suka bertanya.';
         let slipGuruBesarName = 'MAZUIN BINTI AHMAD KAMIL';
         let slipGuruKelasName = '';
+        let slipKpmLogoData = localStorage.getItem('slipKpmLogoData') || '';
+        let slipSchoolLogoData = localStorage.getItem('slipSchoolLogoData') || '';
 
         // State pendaftaran & CSV
         let pendingRegistrationData = null;
@@ -972,6 +974,9 @@ currentUser.fullName = namaGuru;
                 </button>
                 <button onclick="navigate('analisis')" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all" data-page="analisis">
                     <i data-lucide="bar-chart-3"></i><span>Analisis</span>
+                </button>
+                <button onclick="navigate('slip_pentaksiran')" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all" data-page="slip_pentaksiran">
+                    <i data-lucide="file-text"></i><span>Slip Sumatif</span>
                 </button>`;
             } else {
                 html += `
@@ -1472,21 +1477,59 @@ currentUser.fullName = namaGuru;
 
 
         // --- SLIP PENTAKSIRAN SUMATIF A4 POTRET ---
-        const slipSubjects = [
+        const slipSubjectsTahap1 = [
             'BAHASA MELAYU',
             'BAHASA INGGERIS',
             'MATEMATIK',
             'SAINS',
-            'SEJARAH',
             'PENDIDIKAN ISLAM',
-            'PENDIDIKAN MORAL',
             'BAHASA ARAB',
-            'BAHASA IBAN',
+            'PENDIDIKAN SENI VISUAL',
+            'PENDIDIKAN JASMANI DAN KESIHATAN',
+            'MUZIK'
+        ];
+
+        const slipSubjectsTahap2 = [
+            'BAHASA MELAYU',
+            'BAHASA INGGERIS',
+            'MATEMATIK',
+            'SAINS',
+            'PENDIDIKAN ISLAM',
+            'BAHASA ARAB',
             'PENDIDIKAN SENI VISUAL',
             'PENDIDIKAN JASMANI DAN KESIHATAN',
             'MUZIK',
+            'SEJARAH',
             'REKA BENTUK TEKNOLOGI'
         ];
+
+        function getSlipSubjectsForStudent(student) {
+            const yearLevel = getStudentYear(student?.kelas);
+            return yearLevel >= 4 ? slipSubjectsTahap2 : slipSubjectsTahap1;
+        }
+
+        function getSlipLogoSrc(type) {
+            if (type === 'kpm') return slipKpmLogoData || 'kpm.png';
+            return slipSchoolLogoData || 'logo.png';
+        }
+
+        function handleSlipLogoUpload(type, event) {
+            const file = event.target.files && event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                if (type === 'kpm') {
+                    slipKpmLogoData = e.target.result;
+                    localStorage.setItem('slipKpmLogoData', slipKpmLogoData);
+                } else {
+                    slipSchoolLogoData = e.target.result;
+                    localStorage.setItem('slipSchoolLogoData', slipSchoolLogoData);
+                }
+                showToast('Logo slip berjaya dimuat naik.', 'success');
+                renderPage();
+            };
+            reader.readAsDataURL(file);
+        }
 
         function getSlipStudent() {
             return students.find(s => String(s.id) === String(slipSelectedStudentId)) || students[0] || null;
@@ -1528,9 +1571,10 @@ currentUser.fullName = namaGuru;
 
         function getStudentTotalForSlip(student) {
             if (!student) return { total: 0, percent: 0, numericCount: 0 };
+            const subjectsForSlip = getSlipSubjectsForStudent(student);
             let total = 0;
             let numericCount = 0;
-            slipSubjects.forEach(subject => {
+            subjectsForSlip.forEach(subject => {
                 const mark = getSlipMark(student.id, subject);
                 const num = parseFloat(mark);
                 if (!Number.isNaN(num)) {
@@ -1538,7 +1582,7 @@ currentUser.fullName = namaGuru;
                     numericCount++;
                 }
             });
-            const percent = slipSubjects.length > 0 ? (total / (slipSubjects.length * 100)) * 100 : 0;
+            const percent = subjectsForSlip.length > 0 ? (total / (subjectsForSlip.length * 100)) * 100 : 0;
             return { total, percent, numericCount };
         }
 
@@ -1571,9 +1615,10 @@ currentUser.fullName = namaGuru;
                 return `<div class="bg-white p-6 rounded-2xl border border-emerald-100 text-center text-sm font-bold text-slate-500">Tiada data murid. Sila import data murid terlebih dahulu.</div>`;
             }
 
+            const subjectsForSlip = getSlipSubjectsForStudent(student);
             const summary = getStudentTotalForSlip(student);
             const rank = getSlipClassRank(student);
-            const rows = slipSubjects.map((subject, idx) => {
+            const rows = subjectsForSlip.map((subject, idx) => {
                 const mark = getSlipMark(student.id, subject);
                 const markText = mark === '' || mark === null || mark === undefined ? '' : mark;
                 return `
@@ -1608,6 +1653,14 @@ currentUser.fullName = namaGuru;
                                     ${years.map(y => `<option value="${y}" ${slipSelectedYear===y?'selected':''}>${y}</option>`).join('')}
                                 </select>
                             </div>
+                            <div>
+                                <label class="text-[10px] font-black text-slate-400 uppercase">Upload Logo KPM</label>
+                                <input type="file" accept="image/*" onchange="handleSlipLogoUpload('kpm', event)" class="w-full p-2 border border-slate-200 rounded-xl text-[10px] font-bold outline-none bg-white" />
+                            </div>
+                            <div>
+                                <label class="text-[10px] font-black text-slate-400 uppercase">Upload Logo Sekolah</label>
+                                <input type="file" accept="image/*" onchange="handleSlipLogoUpload('school', event)" class="w-full p-2 border border-slate-200 rounded-xl text-[10px] font-bold outline-none bg-white" />
+                            </div>
                             <button onclick="printSlipPDF()" class="px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-black flex items-center justify-center gap-2">
                                 <i data-lucide="printer" class="w-4 h-4"></i> Cetak PDF
                             </button>
@@ -1626,13 +1679,13 @@ currentUser.fullName = namaGuru;
 
                     <div class="slip-a4-page" id="slip-print-area">
                         <div class="slip-school-header">
-                            <div class="slip-logo-box"><img src="kpm.png" alt="Logo KPM" onerror="this.outerHTML='LOGO<br>KPM'" /></div>
+                            <div class="slip-logo-box"><img src="${getSlipLogoSrc('kpm')}" alt="Logo KPM" onerror="this.outerHTML='LOGO<br>KPM'" /></div>
                             <div class="slip-school-name">
                                 <h1>SEKOLAH KEBANGSAAN BUKIT TONGKAT</h1>
                                 <p>JALAN MAWAR FELDA ULU BELITONG</p>
                                 <p>86000 KLUANG, JOHOR.</p>
                             </div>
-                            <div class="slip-logo-box"><img src="logo.png" alt="Logo Sekolah" onerror="this.outerHTML='LOGO<br>SEKOLAH'" /></div>
+                            <div class="slip-logo-box"><img src="${getSlipLogoSrc('school')}" alt="Logo Sekolah" onerror="this.outerHTML='LOGO<br>SEKOLAH'" /></div>
                         </div>
 
                         <div class="slip-title-box">SLIP ${getSlipTitle()}</div>
@@ -1644,7 +1697,6 @@ currentUser.fullName = namaGuru;
                             </div>
                             <div>
                                 <div class="slip-info-row"><strong>Kelas</strong><span>:</span><span>${student.kelas || '-'}</span></div>
-                                <div class="slip-info-row"><strong>Jantina</strong><span>:</span><span>${getSlipGender(student.ic)}</span></div>
                             </div>
                         </div>
 
@@ -1770,7 +1822,7 @@ currentUser.fullName = namaGuru;
             }
 
 
-            else if (currentPage === 'slip_pentaksiran' && isAdmin) {
+            else if (currentPage === 'slip_pentaksiran' && (isAdmin || currentUser?.role === 'Guru Kelas')) {
                 content.innerHTML = renderSlipPentaksiranPage();
             }
 
