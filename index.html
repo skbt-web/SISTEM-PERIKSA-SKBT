@@ -733,8 +733,12 @@ const { data: teacher } = await supabaseClient
   .from("teachers")
   .select("name")
   .eq("email", emailGuru)
-  .single();
-
+  .maybesingle();
+                
+  console.log("emailGuru =", emailGuru);
+console.log("teacher =", teacher);
+console.log("error =", error);
+                
 currentUser.name = teacher?.name || "Guru";
 currentUser.fullName = teacher?.name || "Guru";
                 showApp();
