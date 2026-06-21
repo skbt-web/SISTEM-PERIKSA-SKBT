@@ -727,7 +727,18 @@
 
                 isAdmin = type === 'admin';
                 await fetchAllDataFromSupabase();
+                const emailGuru = (await supabaseClient.auth.getUser()).data.user.email;
+
+const { data: teacher } = await supabaseClient
+  .from("teachers")
+  .select("name")
+  .eq("email", emailGuru)
+  .single();
+
+currentUser.name = teacher?.name || "Guru";
+currentUser.fullName = teacher?.name || "Guru";
                 showApp();
+                showToast(`👋 Selamat datang, ${currentUser.name}!`, 'success');
                 showToast(`Log masuk berjaya sebagai ${currentUser.role}: ${currentUser.name}!`, 'success');
             } catch (err) {
                 console.error('Login Supabase gagal:', err);
