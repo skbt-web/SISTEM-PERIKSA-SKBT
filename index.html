@@ -386,7 +386,7 @@
         }
 
         async function fetchAllDataFromSupabase() {
-            if (!supabaseEnabled || !supabaseClientClient) return;
+            if (!supabaseEnabled || !supabaseClient) return;
             try {
                 const { data: studentRows, error: studentError } = await supabase
                     .from('students')
@@ -435,7 +435,7 @@
         }
 
         async function persistStudentToSupabase(student) {
-            if (!supabaseEnabled || !supabaseClientClient) return;
+            if (!supabaseEnabled || !supabaseClient) return;
             try {
                 const { error } = await supabase
                     .from('students')
@@ -477,7 +477,7 @@
         }
 
         async function deleteStudentFromSupabase(id) {
-            if (!supabaseEnabled || !supabaseClientClient) return;
+            if (!supabaseEnabled || !supabaseClient) return;
             try {
                 const { error } = await supabase
                     .from('students')
@@ -491,7 +491,7 @@
         }
 
         async function persistMarksBulkToSupabase(markRows, pbdRows) {
-            if (!supabaseEnabled || !supabaseClientClient) return;
+            if (!supabaseEnabled || !supabaseClient) return;
             try {
                 if (markRows.length > 0) {
                     const { error } = await supabase
