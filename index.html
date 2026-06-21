@@ -729,18 +729,18 @@
                 await fetchAllDataFromSupabase();
                 const emailGuru = (await supabaseClient.auth.getUser()).data.user.email;
 
-const { data: teacher } = await supabaseClient
+const { data: teacher,error } = await supabaseClient
   .from("teachers")
   .select("name")
   .eq("email", emailGuru)
   .maybeSingle();
                 
-  console.log("emailGuru =", emailGuru);
-console.log("teacher =", teacher);
-console.log("error =", error);
+console.log("Email login =", emailGuru);
+console.log("Teacher =", teacher);
+console.log("Error =", error);
                 
 currentUser.name = teacher?.name || "Guru";
-currentUser.fullName = teacher?.name || "Guru";
+currentUser.fullName = currentUser?.name;
                 showApp();
                 showToast(`👋 Selamat datang, ${currentUser.name}!`, 'success');
             } catch (err) {
@@ -1328,7 +1328,7 @@ currentUser.fullName = teacher?.name || "Guru";
                     <div class="space-y-6">
                         <div class="bg-gradient-to-r from-emerald-600 to-teal-600 text-white p-6 md:p-8 rounded-3xl shadow-md border border-emerald-500/10 relative overflow-hidden">
                             <div class="relative z-10 space-y-2">
-                                <h3 class="text-xl md:text-2xl font-extrabold tracking-tight">Selamat Datang, ${currentUser?.name || 'guru'}</h3>
+                                <h3 class="text-xl md:text-2xl font-extrabold tracking-tight">Selamat Datang, ${currentUser.name}</h3>
                                 <p class="text-xs md:text-sm text-emerald-100 font-medium">Sistem Pengurusan Murid, Analisis Akademik Pentaksiran UASA & Penilaian Bilik Darjah (PBD).</p>
                             </div>
                             <i data-lucide="sparkles" class="absolute right-6 bottom-4 w-28 h-28 opacity-10 rotate-12"></i>
