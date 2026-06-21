@@ -329,7 +329,7 @@
 
         // State modul analisis
         let analysisSelectedAssessment = 'PENTAKSIRAN SUMATIF 1';
-        let analysisSelectedMode = 'overall_pbd_report'; // 'overall_pbd_report' | 'pbd_excel_dashboard' | 'individu' | 'pbd_ringkasan'
+        let analysisSelectedMode = 'sumatif_grade_report'; // 'sumatif_grade_report' | 'overall_pbd_report' | 'pbd_excel_dashboard' | 'individu' | 'pbd_ringkasan'
         let analysisSelectedStudentId = 1; 
         let analysisSelectedClass = '1 AR-RAZI';
         let analysisSelectedYearPBD = '1';
@@ -655,6 +655,19 @@
             } catch (err) {
                 console.error("Gagal eksport:", err);
                 showToast("Ralat eksport fail.", "danger");
+            }
+        }
+
+
+        function exportSumatifGradeExcel() {
+            try {
+                const table = document.getElementById("sumatif-grade-table");
+                const wb = XLSX.utils.table_to_book(table, { raw: true });
+                XLSX.writeFile(wb, `Analisis_Sumatif_A_F_${analysisSelectedAssessment}_${analysisSelectedAcademicYearPBD}.xlsx`);
+                showToast("Analisis Sumatif berjaya dieksport ke Excel!", "success");
+            } catch (err) {
+                console.error("Gagal eksport analisis sumatif:", err);
+                showToast("Ralat eksport analisis sumatif.", "danger");
             }
         }
 
@@ -1578,6 +1591,9 @@
                     <div class="space-y-6">
                         <!-- Navigation tabs -->
                         <div class="flex flex-wrap items-center gap-2 border-b border-slate-200 no-print">
+                            <button onclick="changeAnalysisMode('sumatif_grade_report')" class="px-4 py-2 text-xs font-bold transition-all border-b-2 ${analysisSelectedMode==='sumatif_grade_report'?'border-emerald-600 text-emerald-700':'border-transparent text-gray-400 hover:text-slate-600'}">
+                                📋 Analisis Sumatif A-F
+                            </button>
                             <button onclick="changeAnalysisMode('overall_pbd_report')" class="px-4 py-2 text-xs font-bold transition-all border-b-2 ${analysisSelectedMode==='overall_pbd_report'?'border-emerald-600 text-emerald-700':'border-transparent text-gray-400 hover:text-slate-600'}">
                                 📊 Laporan Keseluruhan Kelas (etert.jpg)
                             </button>
@@ -1592,7 +1608,8 @@
                             </button>
                         </div>
 
-                        ${analysisSelectedMode === 'overall_pbd_report' ? renderOverallPBDReport() : 
+                        ${analysisSelectedMode === 'sumatif_grade_report' ? renderSumatifGradeReport() :
+                          analysisSelectedMode === 'overall_pbd_report' ? renderOverallPBDReport() : 
                           analysisSelectedMode === 'pbd_excel_dashboard' ? renderExcelReportMode() : 
                           analysisSelectedMode === 'pbd_ringkasan' ? renderAnalysisPBD() : renderAnalysisIndividu()}
                     </div>
@@ -1700,6 +1717,151 @@
             
             label.className = `grade-label inline-block px-3 py-1 rounded-full font-bold text-[10px] border ${calculated.color}`;
             label.innerText = `${calculated.grade} (${calculated.label})`;
+        }
+
+
+        function getSubjectStudentCountForYear(yearNum) {
+            return students.filter(s => String(s.kelas || '').startsWith(String(yearNum) + ' ')).length;
+        }
+
+        function calculateGradeStatsForYear(yearNum, subject, assessmentName) {
+            const activeStudents = students.filter(s => String(s.kelas || '').startsWith(String(yearNum) + ' '));
+            const stats = { A: 0, B: 0, C: 0, D: 0, E: 0, F: 0, total: activeStudents.length, filled: 0 };
+            activeStudents.forEach(st => {
+                const key = `${st.id}_${analysisSelectedAcademicYearPBD}_${assessmentName}_${subject}`;
+                const raw = studentMarks[key];
+                if (raw !== undefined && raw !== null && raw !== '') {
+                    const grade = calculateUASAGrade(raw).grade;
+                    if (stats[grade] !== undefined) {
+                        stats[grade]++;
+                        stats.filled++;
+                    }
+                }
+            });
+            return stats;
+        }
+
+        function renderGradeCells(stats) {
+            const denominator = stats.total || 1;
+            return ['A', 'B', 'C', 'D', 'E', 'F'].map(g => {
+                const bil = stats[g] || 0;
+                const pct = ((bil / denominator) * 100).toFixed(2);
+                return `<td>${bil}</td><td>${pct}</td>`;
+            }).join('');
+        }
+
+        function wrapSubjectName(subject) {
+            return String(subject || '').split(' ').map(w => w.length > 10 ? w.slice(0, 10) + '<br>' + w.slice(10) : w).join('<br>');
+        }
+
+        function cloneGradeStats() {
+            return { A: 0, B: 0, C: 0, D: 0, E: 0, F: 0, total: 0, filled: 0 };
+        }
+
+        function addGradeStats(target, source) {
+            ['A', 'B', 'C', 'D', 'E', 'F'].forEach(g => target[g] += (source[g] || 0));
+            target.total += (source.total || 0);
+            target.filled += (source.filled || 0);
+        }
+
+        function renderSumatifGradeReport() {
+            const yearsList = ['1', '2', '3', '4', '5', '6'];
+            const selectedAssessmentForReport = analysisSelectedAssessment || 'PENTAKSIRAN SUMATIF 1';
+            let grand = cloneGradeStats();
+
+            const reportRows = baseSubjects.map(subject => {
+                const subjectTotal = cloneGradeStats();
+                const yearRows = yearsList.map((yr, idx) => {
+                    const stats = calculateGradeStatsForYear(yr, subject, selectedAssessmentForReport);
+                    addGradeStats(subjectTotal, stats);
+                    addGradeStats(grand, stats);
+
+                    return `
+                        <tr>
+                            ${idx === 0 ? `<td rowspan="${yearsList.length + 1}" class="excel-bg-purple-subject text-center align-middle font-bold leading-tight">${wrapSubjectName(subject)}</td>` : ''}
+                            ${idx === 0 ? `<td rowspan="${yearsList.length + 1}" class="text-center align-middle font-bold">${subjectTotal.total || yearsList.reduce((sum, y) => sum + getSubjectStudentCountForYear(y), 0)}</td>` : ''}
+                            <td class="excel-bg-blue-year font-bold">TAHUN ${yr}</td>
+                            ${renderGradeCells(stats)}
+                        </tr>
+                    `;
+                }).join('');
+
+                const totalRows = `
+                    <tr class="excel-bg-yellow-total">
+                        <td class="font-bold">JUMLAH</td>
+                        ${renderGradeCells(subjectTotal)}
+                    </tr>
+                `;
+
+                return yearRows + totalRows;
+            }).join('');
+
+            return `
+                <div class="space-y-4">
+                    <div class="bg-white p-4 rounded-xl border border-slate-100 shadow-sm flex flex-col md:flex-row items-center justify-between gap-3 no-print font-bold">
+                        <div class="flex flex-wrap items-center gap-3">
+                            <div class="space-y-1">
+                                <span class="text-[10px] font-bold text-slate-400 uppercase block">Pentaksiran</span>
+                                <select onchange="analysisSelectedAssessment=this.value; renderPage()" class="p-2 border border-slate-200 rounded-lg text-xs font-bold text-slate-700 outline-none">
+                                    ${assessments.map(a => `<option value="${a}" ${selectedAssessmentForReport===a?'selected':''}>${a}</option>`).join('')}
+                                </select>
+                            </div>
+                            <div class="space-y-1">
+                                <span class="text-[10px] font-bold text-slate-400 uppercase block">Sesi Akademik</span>
+                                <select onchange="analysisSelectedAcademicYearPBD=this.value; renderPage()" class="p-2 border border-slate-200 rounded-lg text-xs font-bold text-slate-700 outline-none">
+                                    ${years.map(y => `<option value="${y}" ${analysisSelectedAcademicYearPBD===y?'selected':''}>${y}</option>`).join('')}
+                                </select>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <button onclick="exportSumatifGradeExcel()" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg text-xs flex items-center gap-1.5 transition-all shadow-sm">
+                                <i data-lucide="file-spreadsheet" class="w-4 h-4"></i> Export Excel
+                            </button>
+                            <button onclick="printReport()" class="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white font-bold rounded-lg text-xs flex items-center gap-1.5 transition-all shadow-sm">
+                                <i data-lucide="printer" class="w-4 h-4"></i> Print
+                            </button>
+                        </div>
+                    </div>
+
+                    <div id="print-area" class="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm excel-report-container">
+                        <div class="text-center pb-3">
+                            <h2 class="text-lg font-bold uppercase tracking-tight">ANALISA ${selectedAssessmentForReport} ${analysisSelectedAcademicYearPBD}</h2>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table id="sumatif-grade-table" class="excel-table text-[10px]">
+                                <thead>
+                                    <tr>
+                                        <th rowspan="2" class="excel-bg-purple-subject">MATA<br>PELAJARAN</th>
+                                        <th rowspan="2" class="excel-bg-yellow-total">BIL<br>MURID</th>
+                                        <th rowspan="2" class="excel-bg-blue-year">TAHUN/<br>GRED</th>
+                                        <th colspan="2">A</th>
+                                        <th colspan="2">B</th>
+                                        <th colspan="2">C</th>
+                                        <th colspan="2">D</th>
+                                        <th colspan="2">E</th>
+                                        <th colspan="2">F</th>
+                                    </tr>
+                                    <tr>
+                                        <th>BIL</th><th>%</th>
+                                        <th>BIL</th><th>%</th>
+                                        <th>BIL</th><th>%</th>
+                                        <th>BIL</th><th>%</th>
+                                        <th>BIL</th><th>%</th>
+                                        <th>BIL</th><th>%</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${reportRows}
+                                    <tr class="excel-bg-yellow-total">
+                                        <td colspan="3" class="text-right font-bold">JUMLAH KESELURUHAN</td>
+                                        ${renderGradeCells(grand)}
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            `;
         }
 
         // --- NEW: RENDER OVERALL PBD REPORT (etert.jpg) ---
