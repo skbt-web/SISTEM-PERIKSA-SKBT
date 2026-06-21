@@ -1,353 +1,236 @@
-<!DOCTYPE html>
-<html lang="ms">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sistem Pengurusan Markah Sekolah</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/lucide@latest"></script>
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
-        body { font-family: 'Inter', sans-serif; }
-        .hidden-view { display: none; }
-    </style>
-</head>
-<body class="bg-slate-50 text-slate-900">
+-- SISMAR Supabase Schema v2
+-- Run di Supabase > SQL Editor.
+-- Versi ini tidak mengubah struktur asal students, marks dan pbd.
+-- Ia hanya tambah jadual rujukan, RLS asas, dan UNIQUE constraint untuk elak rekod berganda.
 
-    <!-- LOGIN PAGE -->
-    <div id="login-page" class="min-h-screen flex items-center justify-center p-4">
-        <div class="max-w-md w-full bg-white rounded-2xl shadow-xl p-8 border border-slate-100">
-            <div class="text-center mb-8">
-                <div class="bg-blue-600 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <i data-lucide="graduation-cap" class="text-white w-10 h-10"></i>
-                </div>
-                <h1 class="text-2xl font-bold text-slate-800">Sistem Akademik Sekolah</h1>
-                <p class="text-slate-500 mt-2">Log masuk untuk teruskan</p>
-            </div>
-            
-            <form id="login-form" class="space-y-6">
-                <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-2">Alamat Emel</label>
-                    <input type="email" id="email" required class="w-full px-4 py-3 rounded-lg border border-slate-200 focus:ring-2 focus:ring-blue-500 outline-none transition" placeholder="nama@sekolah.edu">
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-2">Kata Laluan</label>
-                    <input type="password" id="password" required class="w-full px-4 py-3 rounded-lg border border-slate-200 focus:ring-2 focus:ring-blue-500 outline-none transition" placeholder="••••••••">
-                </div>
-                <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-lg shadow-lg shadow-blue-200 transition transform active:scale-95">
-                    Log Masuk
-                </button>
-            </form>
-            <div class="mt-8 pt-6 border-t border-slate-100 text-xs text-slate-400 text-center">
-                Disediakan oleh Unit ICT Sekolah &copy; 2024
-            </div>
-        </div>
-    </div>
+create table if not exists students (
+  id bigint primary key,
+  nama text not null,
+  ic text unique not null,
+  kelas text not null,
+  tahun int,
+  updated_at timestamptz default now(),
+  created_at timestamptz default now()
+);
 
-    <!-- MAIN APP LAYOUT (Hidden initially) -->
-    <div id="main-app" class="hidden-view">
-        <!-- SIDEBAR -->
-        <aside class="w-64 bg-slate-900 min-h-screen text-slate-300 flex flex-col fixed left-0 top-0">
-            <div class="p-6 border-b border-slate-800 flex items-center gap-3">
-                <i data-lucide="graduation-cap" class="text-blue-400 w-8 h-8"></i>
-                <span class="font-bold text-white tracking-tight">EDU-Portal</span>
-            </div>
-            
-            <nav class="flex-1 p-4 space-y-2">
-                <button onclick="changeView('dashboard')" id="nav-dashboard" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl transition bg-blue-600 text-white">
-                    <i data-lucide="layout-dashboard" size="20"></i> Dashboard
-                </button>
-                <button onclick="changeView('students')" id="nav-students" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl transition hover:bg-slate-800">
-                    <i data-lucide="users" size="20"></i> <span id="text-nav-students">Data Murid</span>
-                </button>
-                <button id="nav-subjects" class="w-full flex items-center gap-3 px-4 py-3 rounded-xl transition hover:bg-slate-800 hidden">
-                    <i data-lucide="book-open" size="20"></i> Urus Subjek
-                </button>
-            </nav>
+create table if not exists marks (
+  key text primary key,
+  student_id text not null,
+  tahun text not null,
+  assessment text not null,
+  subject text not null,
+  value numeric,
+  teacher_email text,
+  updated_at timestamptz default now()
+);
 
-            <div class="p-4 border-t border-slate-800">
-                <div class="flex items-center gap-3 px-4 py-3 bg-slate-800 rounded-xl mb-4">
-                    <div id="user-avatar" class="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-white font-bold text-xs">U</div>
-                    <div class="overflow-hidden">
-                        <p id="user-name" class="text-sm font-medium text-white truncate">User Name</p>
-                        <p id="user-role" class="text-xs text-slate-400 capitalize">Role</p>
-                    </div>
-                </div>
-                <button onclick="handleLogout()" class="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-red-400 hover:bg-red-500/10 transition">
-                    <i data-lucide="log-out" size="20"></i> Log Keluar
-                </button>
-            </div>
-        </aside>
+create table if not exists pbd (
+  key text primary key,
+  student_id text not null,
+  tahun text not null,
+  assessment text not null,
+  subject text not null,
+  value text,
+  teacher_email text,
+  updated_at timestamptz default now()
+);
 
-        <!-- CONTENT AREA -->
-        <main class="ml-64 p-8">
-            <!-- DASHBOARD VIEW -->
-            <div id="view-dashboard" class="space-y-6">
-                <header class="flex justify-between items-center">
-                    <div>
-                        <h1 class="text-2xl font-bold text-slate-800">Selamat Kembali, <span id="welcome-name">User</span></h1>
-                        <p class="text-slate-500">Ringkasan pencapaian semasa sekolah.</p>
-                    </div>
-                </header>
+-- Jadual tambahan. Tidak ganggu struktur asal.
+create table if not exists teachers (
+  id bigserial primary key,
+  name text not null,
+  email text unique not null,
+  role text default 'guru',
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
 
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6" id="stats-grid">
-                    <!-- Stats injected here -->
-                </div>
+create table if not exists classes (
+  id bigserial primary key,
+  name text unique not null,
+  year_level int,
+  created_at timestamptz default now()
+);
 
-                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    <div class="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
-                        <h3 class="font-bold text-slate-800 mb-6 flex items-center gap-2">
-                            <i data-lucide="trophy" class="text-amber-500 w-5 h-5"></i> Pelajar Cemerlang
-                        </h3>
-                        <div id="top-students" class="space-y-4"></div>
-                    </div>
-                    <div class="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
-                        <h3 class="font-bold text-slate-800 mb-6">Prestasi Mengikut Subjek</h3>
-                        <div id="subject-performance" class="space-y-5"></div>
-                    </div>
-                </div>
-            </div>
+create table if not exists subjects (
+  id bigserial primary key,
+  name text unique not null,
+  created_at timestamptz default now()
+);
 
-            <!-- STUDENTS/MARKS VIEW -->
-            <div id="view-students" class="hidden-view space-y-6">
-                <div class="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-                    <div class="p-6 border-b border-slate-100 flex flex-col md:flex-row gap-4 justify-between items-center">
-                        <div>
-                            <h2 id="view-title" class="text-xl font-bold text-slate-800">Pengurusan Markah</h2>
-                            <p class="text-sm text-slate-500">Kemaskini dan pantau markah peperiksaan murid.</p>
-                        </div>
-                        <div class="flex gap-3 w-full md:w-auto">
-                            <div class="relative flex-1 md:w-64">
-                                <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4"></i>
-                                <input type="text" id="student-search" placeholder="Cari murid..." class="pl-10 pr-4 py-2 w-full rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-blue-500">
-                            </div>
-                            <select id="subject-select" class="px-4 py-2 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-blue-500 bg-white font-medium hidden">
-                                <!-- Options injected -->
-                            </select>
-                        </div>
-                    </div>
-                    <div class="overflow-x-auto">
-                        <table class="w-full text-left">
-                            <thead id="table-head" class="bg-slate-50 text-slate-500 text-xs uppercase tracking-wider font-semibold">
-                                <!-- Head injected -->
-                            </thead>
-                            <tbody id="table-body" class="divide-y divide-slate-100">
-                                <!-- Body injected -->
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-        </main>
-    </div>
+create table if not exists exams (
+  id bigserial primary key,
+  name text unique not null,
+  year text default '2026',
+  created_at timestamptz default now()
+);
 
-    <script>
-        // --- DATA & STATE ---
-        let currentUser = null;
-        const SUBJECTS = [
-            { id: 'BM', name: 'Bahasa Melayu' },
-            { id: 'BI', name: 'Bahasa Inggeris' },
-            { id: 'Math', name: 'Matematik' },
-            { id: 'Science', name: 'Sains' }
-        ];
+-- UNIQUE constraint untuk elak markah dan PBD berganda.
+-- Jika constraint sudah wujud, ia akan dilangkau.
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint where conname = 'marks_unique'
+  ) then
+    alter table marks
+    add constraint marks_unique unique(student_id, tahun, assessment, subject);
+  end if;
+end $$;
 
-        let students = [
-            { id: 1, name: 'Ahmad bin Ibrahim', class: '5 Al-Biruni', marks: { BM: 85, BI: 78, Math: 92, Science: 88 } },
-            { id: 2, name: 'Siti Nurhaliza', class: '5 Al-Biruni', marks: { BM: 92, BI: 88, Math: 75, Science: 82 } },
-            { id: 3, name: 'Chong Wei Hao', class: '5 Al-Khawarizmi', marks: { BM: 70, BI: 95, Math: 98, Science: 90 } },
-            { id: 4, name: 'Ramasamy', class: '5 Al-Khawarizmi', marks: { BM: 75, BI: 72, Math: 80, Science: 78 } },
-        ];
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint where conname = 'pbd_unique'
+  ) then
+    alter table pbd
+    add constraint pbd_unique unique(student_id, tahun, assessment, subject);
+  end if;
+end $$;
 
-        let currentSubject = 'BM';
+alter table students enable row level security;
+alter table marks enable row level security;
+alter table pbd enable row level security;
+alter table teachers enable row level security;
+alter table classes enable row level security;
+alter table subjects enable row level security;
+alter table exams enable row level security;
 
-        // --- CORE FUNCTIONS ---
-        function calculateGrade(mark) {
-            if (mark >= 80) return { grade: 'A', color: 'text-green-600' };
-            if (mark >= 70) return { grade: 'B', color: 'text-blue-600' };
-            if (mark >= 50) return { grade: 'C', color: 'text-yellow-600' };
-            if (mark >= 40) return { grade: 'D', color: 'text-orange-600' };
-            return { grade: 'G', color: 'text-red-600' };
-        }
+-- Polisi asas untuk guru yang login.
+-- Untuk ujian awal, semua akaun authenticated boleh baca dan simpan.
+-- Selepas sistem stabil, polisi boleh diketatkan ikut kelas/subjek guru.
 
-        // --- DOM MANIPULATION ---
-        function initApp() {
-            lucide.createIcons();
-            
-            // Login Handler
-            document.getElementById('login-form').addEventListener('submit', (e) => {
-                e.preventDefault();
-                const email = document.getElementById('email').value;
-                const pass = document.getElementById('password').value;
+drop policy if exists "authenticated read students" on students;
+create policy "authenticated read students"
+on students for select
+to authenticated
+using (true);
 
-                if (email === 'admin@sekolah.edu' && pass === 'admin123') {
-                    currentUser = { role: 'admin', name: 'Admin Utama' };
-                } else if (email === 'guru@sekolah.edu' && pass === 'guru123') {
-                    currentUser = { role: 'guru', name: 'Cikgu Sarah' };
-                } else {
-                    alert('Salah! Guna admin@sekolah.edu/admin123 atau guru@sekolah.edu/guru123');
-                    return;
-                }
-                
-                renderSidebar();
-                renderDashboard();
-                document.getElementById('login-page').classList.add('hidden-view');
-                document.getElementById('main-app').classList.remove('hidden-view');
-            });
+drop policy if exists "authenticated upsert students" on students;
+create policy "authenticated upsert students"
+on students for insert
+to authenticated
+with check (true);
 
-            // Search Handler
-            document.getElementById('student-search').addEventListener('input', renderStudentsTable);
-            
-            // Subject Select Handler
-            const subSelect = document.getElementById('subject-select');
-            SUBJECTS.forEach(s => {
-                const opt = document.createElement('option');
-                opt.value = s.id;
-                opt.textContent = s.name;
-                subSelect.appendChild(opt);
-            });
-            subSelect.addEventListener('change', (e) => {
-                currentSubject = e.target.value;
-                renderStudentsTable();
-            });
-        }
+drop policy if exists "authenticated update students" on students;
+create policy "authenticated update students"
+on students for update
+to authenticated
+using (true)
+with check (true);
 
-        function renderSidebar() {
-            document.getElementById('user-name').textContent = currentUser.name;
-            document.getElementById('welcome-name').textContent = currentUser.name;
-            document.getElementById('user-role').textContent = currentUser.role;
-            document.getElementById('user-avatar').textContent = currentUser.name.charAt(0);
-            document.getElementById('text-nav-students').textContent = currentUser.role === 'admin' ? 'Data Murid' : 'Kelas Saya';
-            
-            if (currentUser.role === 'admin') {
-                document.getElementById('nav-subjects').classList.remove('hidden');
-            } else {
-                document.getElementById('nav-subjects').classList.add('hidden');
-                document.getElementById('subject-select').classList.remove('hidden');
-            }
-        }
+drop policy if exists "authenticated delete students" on students;
+create policy "authenticated delete students"
+on students for delete
+to authenticated
+using (true);
 
-        function changeView(view) {
-            document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('bg-blue-600', 'text-white'));
-            document.getElementById(`nav-${view}`).classList.add('bg-blue-600', 'text-white');
-            
-            if (view === 'dashboard') {
-                document.getElementById('view-dashboard').classList.remove('hidden-view');
-                document.getElementById('view-students').classList.add('hidden-view');
-                renderDashboard();
-            } else {
-                document.getElementById('view-dashboard').classList.add('hidden-view');
-                document.getElementById('view-students').classList.remove('hidden-view');
-                document.getElementById('view-title').textContent = currentUser.role === 'admin' ? 'Pengurusan Markah Keseluruhan' : 'Kemasukan Markah Guru';
-                renderStudentsTable();
-            }
-        }
+drop policy if exists "authenticated read marks" on marks;
+create policy "authenticated read marks"
+on marks for select
+to authenticated
+using (true);
 
-        function renderDashboard() {
-            const total = students.length;
-            const avg = (students.reduce((acc, s) => acc + Object.values(s.marks).reduce((a, b) => a + b, 0) / 4, 0) / total).toFixed(1);
+drop policy if exists "authenticated upsert marks" on marks;
+create policy "authenticated upsert marks"
+on marks for insert
+to authenticated
+with check (true);
 
-            const stats = [
-                { label: 'Jumlah Murid', val: total, icon: 'users', color: 'text-blue-600', bg: 'bg-blue-100' },
-                { label: 'Purata Markah', val: avg + '%', icon: 'trophy', color: 'text-amber-600', bg: 'bg-amber-100' },
-                { label: 'Subjek Aktif', val: SUBJECTS.length, icon: 'book-open', color: 'text-emerald-600', bg: 'bg-emerald-100' },
-                { label: 'Kehadiran Guru', val: '98%', icon: 'user-check', color: 'text-purple-600', bg: 'bg-purple-100' }
-            ];
+drop policy if exists "authenticated update marks" on marks;
+create policy "authenticated update marks"
+on marks for update
+to authenticated
+using (true)
+with check (true);
 
-            const grid = document.getElementById('stats-grid');
-            grid.innerHTML = stats.map(s => `
-                <div class="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-4">
-                    <div class="${s.bg} ${s.color} p-3 rounded-xl"><i data-lucide="${s.icon}"></i></div>
-                    <div>
-                        <p class="text-sm font-medium text-slate-500">${s.label}</p>
-                        <p class="text-2xl font-bold text-slate-800">${s.val}</p>
-                    </div>
-                </div>
-            `).join('');
+drop policy if exists "authenticated read pbd" on pbd;
+create policy "authenticated read pbd"
+on pbd for select
+to authenticated
+using (true);
 
-            // Top Students
-            const topList = [...students].sort((a,b) => (b.marks.Math) - (a.marks.Math)).slice(0,3);
-            document.getElementById('top-students').innerHTML = topList.map((s, i) => `
-                <div class="flex items-center justify-between p-3 bg-slate-50 rounded-xl">
-                    <div class="flex items-center gap-3">
-                        <span class="font-bold text-slate-400 w-5">#${i+1}</span>
-                        <p class="font-medium text-slate-700">${s.name}</p>
-                    </div>
-                    <span class="text-blue-600 font-bold">${((Object.values(s.marks).reduce((a,b)=>a+b,0))/4).toFixed(0)}%</span>
-                </div>
-            `).join('');
+drop policy if exists "authenticated upsert pbd" on pbd;
+create policy "authenticated upsert pbd"
+on pbd for insert
+to authenticated
+with check (true);
 
-            // Subject Performance
-            document.getElementById('subject-performance').innerHTML = SUBJECTS.map(subj => {
-                const sAvg = (students.reduce((acc, s) => acc + s.marks[subj.id], 0) / students.length).toFixed(0);
-                return `
-                    <div>
-                        <div class="flex justify-between text-sm mb-1">
-                            <span class="text-slate-600">${subj.name}</span>
-                            <span class="font-bold">${sAvg}%</span>
-                        </div>
-                        <div class="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
-                            <div class="bg-blue-500 h-full" style="width: ${sAvg}%"></div>
-                        </div>
-                    </div>
-                `;
-            }).join('');
+drop policy if exists "authenticated update pbd" on pbd;
+create policy "authenticated update pbd"
+on pbd for update
+to authenticated
+using (true)
+with check (true);
 
-            lucide.createIcons();
-        }
+-- Polisi jadual tambahan.
+drop policy if exists "authenticated read teachers" on teachers;
+create policy "authenticated read teachers"
+on teachers for select
+to authenticated
+using (true);
 
-        function renderStudentsTable() {
-            const query = document.getElementById('student-search').value.toLowerCase();
-            const filtered = students.filter(s => s.name.toLowerCase().includes(query) || s.class.toLowerCase().includes(query));
-            
-            const head = document.getElementById('table-head');
-            const body = document.getElementById('table-body');
+drop policy if exists "authenticated insert teachers" on teachers;
+create policy "authenticated insert teachers"
+on teachers for insert
+to authenticated
+with check (true);
 
-            if (currentUser.role === 'admin') {
-                head.innerHTML = `<tr><th class="px-6 py-4">Pelajar</th><th class="px-6 py-4">Kelas</th>${SUBJECTS.map(s => `<th class="px-6 py-4 text-center">${s.id}</th>`).join('')}</tr>`;
-                body.innerHTML = filtered.map(s => `
-                    <tr>
-                        <td class="px-6 py-4"><div class="font-semibold">${s.name}</div></td>
-                        <td class="px-6 py-4"><span class="px-3 py-1 bg-blue-50 text-blue-600 rounded-full text-xs font-bold">${s.class}</span></td>
-                        ${SUBJECTS.map(sub => `<td class="px-6 py-4 text-center font-bold ${calculateGrade(s.marks[sub.id]).color}">${s.marks[sub.id]}</td>`).join('')}
-                    </tr>
-                `).join('');
-            } else {
-                head.innerHTML = `<tr><th class="px-6 py-4">Pelajar</th><th class="px-6 py-4">Kelas</th><th class="px-6 py-4 text-center">Markah (${currentSubject})</th><th class="px-6 py-4 text-center">Gred</th><th class="px-6 py-4 text-center">Tindakan</th></tr>`;
-                body.innerHTML = filtered.map(s => `
-                    <tr>
-                        <td class="px-6 py-4"><div class="font-semibold">${s.name}</div></td>
-                        <td class="px-6 py-4"><span class="px-3 py-1 bg-blue-50 text-blue-600 rounded-full text-xs font-bold">${s.class}</span></td>
-                        <td class="px-6 py-4 text-center">
-                            <input type="number" onchange="updateMark(${s.id}, '${currentSubject}', this.value)" class="w-16 px-2 py-1 border border-slate-200 rounded-lg text-center font-bold" value="${s.marks[currentSubject]}">
-                        </td>
-                        <td class="px-6 py-4 text-center">
-                            <span class="font-black text-lg ${calculateGrade(s.marks[currentSubject]).color}">${calculateGrade(s.marks[currentSubject]).grade}</span>
-                        </td>
-                        <td class="px-6 py-4 text-center text-slate-400"><i data-lucide="save" class="w-5 h-5 mx-auto cursor-pointer hover:text-blue-500"></i></td>
-                    </tr>
-                `).join('');
-            }
-            lucide.createIcons();
-        }
+drop policy if exists "authenticated update teachers" on teachers;
+create policy "authenticated update teachers"
+on teachers for update
+to authenticated
+using (true)
+with check (true);
 
-        function updateMark(id, subj, val) {
-            const num = parseInt(val) || 0;
-            const student = students.find(s => s.id === id);
-            if (student) {
-                student.marks[subj] = Math.min(100, Math.max(0, num));
-                renderStudentsTable(); // Refresh UI
-            }
-        }
+drop policy if exists "authenticated read classes" on classes;
+create policy "authenticated read classes"
+on classes for select
+to authenticated
+using (true);
 
-        function handleLogout() {
-            currentUser = null;
-            document.getElementById('login-page').classList.remove('hidden-view');
-            document.getElementById('main-app').classList.add('hidden-view');
-            document.getElementById('email').value = '';
-            document.getElementById('password').value = '';
-        }
+drop policy if exists "authenticated read subjects" on subjects;
+create policy "authenticated read subjects"
+on subjects for select
+to authenticated
+using (true);
 
-        window.onload = initApp;
-    </script>
-</body>
-</html>
+drop policy if exists "authenticated read exams" on exams;
+create policy "authenticated read exams"
+on exams for select
+to authenticated
+using (true);
+
+-- Data rujukan asas. Tidak wajib, tetapi memudahkan dropdown jika mahu guna kemudian.
+insert into exams(name, year) values
+('PENTAKSIRAN SUMATIF 1', '2026'),
+('PENTAKSIRAN SUMATIF 2', '2026'),
+('UJIAN AKHIR SESI AKADEMIK (UASA)', '2026')
+on conflict (name) do nothing;
+
+insert into classes(name, year_level) values
+('1 AR-RAZI', 1),
+('1 AL-KHAWARIZMI', 1),
+('2 AR-RAZI', 2),
+('2 AL-KHAWARIZMI', 2),
+('3 AR-RAZI', 3),
+('3 AL-KHAWARIZMI', 3),
+('4 AR-RAZI', 4),
+('4 AL-KHAWARIZMI', 4),
+('5 AR-RAZI', 5),
+('6 AR-RAZI', 6),
+('6 AL-KHAWARIZMI', 6)
+on conflict (name) do nothing;
+
+insert into subjects(name) values
+('BAHASA ARAB'),
+('BAHASA INGGERIS'),
+('BAHASA MELAYU'),
+('MATEMATIK'),
+('SAINS'),
+('PENDIDIKAN ISLAM'),
+('PENDIDIKAN JASMANI DAN KESIHATAN'),
+('MUZIK'),
+('PENDIDIKAN SENI VISUAL'),
+('SEJARAH'),
+('REKA BENTUK TEKNOLOGI')
+on conflict (name) do nothing;
