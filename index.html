@@ -745,7 +745,7 @@ if (!teacherError && teacher?.name) {
   console.error("Ralat ambil nama guru:", e);
 }
            
-currentUser.name = namaGuru;
+currentUser.name = teacher?.name || namaGuru;
 currentUser.fullName = namaGuru;
                 
                 showApp();
