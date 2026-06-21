@@ -732,7 +732,7 @@
                 try{
                 const emailGuru = (await supabaseClient.auth.getUser()).data.user.email;
 
-const { data: teacher,error } = await supabaseClient
+const { data: teacher,error: teacherError } = await supabaseClient
   .from("teachers")
   .select("name")
   .eq("email", emailGuru)
