@@ -113,6 +113,142 @@
                 print-color-adjust: exact !important;
             }
         }
+
+
+        /* --- SLIP PENTAKSIRAN SUMATIF: A4 POTRET --- */
+        .slip-admin-panel { font-family: Arial, Helvetica, sans-serif; }
+        .slip-a4-page {
+            width: 210mm;
+            min-height: 297mm;
+            margin: 0 auto;
+            background: #ffffff;
+            color: #000000;
+            font-family: Arial, Helvetica, sans-serif;
+            padding: 12mm 14mm;
+            box-sizing: border-box;
+            border: 1px solid #e5e7eb;
+        }
+        .slip-school-header {
+            display: grid;
+            grid-template-columns: 25mm 1fr 25mm;
+            align-items: center;
+            gap: 8px;
+            border-bottom: 1px solid #000;
+            padding-bottom: 8px;
+        }
+        .slip-logo-box {
+            width: 22mm;
+            height: 22mm;
+            border: 1px solid #000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            font-size: 9px;
+            font-weight: bold;
+            text-align: center;
+        }
+        .slip-logo-box img { width: 100%; height: 100%; object-fit: contain; }
+        .slip-school-name { text-align: center; line-height: 1.25; }
+        .slip-school-name h1 { font-size: 15px; font-weight: 800; margin: 0; }
+        .slip-school-name p { font-size: 11px; font-weight: 600; margin: 1px 0; }
+        .slip-title-box {
+            border: 1px solid #000;
+            text-align: center;
+            font-weight: 800;
+            font-size: 13px;
+            margin: 10px auto 10px auto;
+            padding: 6px 10px;
+            width: 72%;
+            line-height: 1.3;
+        }
+        .slip-info-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10mm;
+            font-size: 11px;
+            margin: 8px 0;
+        }
+        .slip-info-row {
+            display: grid;
+            grid-template-columns: 30mm 4mm 1fr;
+            margin-bottom: 4px;
+        }
+        .slip-result-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 10.5px;
+            margin-top: 8px;
+        }
+        .slip-result-table th,
+        .slip-result-table td {
+            border: 1px solid #000;
+            padding: 4px 5px;
+            color: #000;
+        }
+        .slip-result-table th {
+            text-align: center;
+            font-weight: 800;
+            background: #fff;
+        }
+        .slip-result-table td:nth-child(1),
+        .slip-result-table td:nth-child(3),
+        .slip-result-table td:nth-child(4) { text-align: center; }
+        .slip-summary-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 14mm;
+            font-size: 11px;
+            margin-top: 8px;
+        }
+        .slip-ulasan {
+            border: 1px solid #000;
+            min-height: 25mm;
+            padding: 7px;
+            font-size: 11px;
+            margin-top: 8px;
+        }
+        .slip-signature-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 25mm;
+            margin-top: 18mm;
+            font-size: 11px;
+            text-align: center;
+        }
+        .slip-signature-line { border-top: 1px solid #000; padding-top: 5px; font-weight: 700; }
+        .slip-muted { color: #111827; }
+        @media print {
+            body.slip-print-mode { background: #ffffff !important; }
+            body.slip-print-mode .no-print,
+            body.slip-print-mode aside,
+            body.slip-print-mode header,
+            body.slip-print-mode #sidebar-overlay,
+            body.slip-print-mode #toast-container,
+            body.slip-print-mode .slip-control-panel {
+                display: none !important;
+            }
+            body.slip-print-mode #app-container,
+            body.slip-print-mode main,
+            body.slip-print-mode #page-content {
+                display: block !important;
+                height: auto !important;
+                overflow: visible !important;
+                padding: 0 !important;
+                margin: 0 !important;
+                background: #ffffff !important;
+            }
+            body.slip-print-mode .slip-a4-page {
+                width: 100% !important;
+                min-height: auto !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                border: none !important;
+                box-shadow: none !important;
+                page-break-after: avoid !important;
+            }
+        }
+
     </style>
 </head>
 <body class="bg-emerald-50/30 min-h-screen">
@@ -335,6 +471,12 @@
         let analysisSelectedYearPBD = '1';
         let analysisSelectedSessionPBD = 'PSA';
         let analysisSelectedAcademicYearPBD = '2026';
+        let slipSelectedStudentId = 1;
+        let slipSelectedAssessment = 'PENTAKSIRAN SUMATIF 1';
+        let slipSelectedYear = '2026';
+        let slipUlasanGuruKelas = 'Seorang murid yang rajin dan suka bertanya.';
+        let slipGuruBesarName = 'MAZUIN BINTI AHMAD KAMIL';
+        let slipGuruKelasName = '';
 
         // State pendaftaran & CSV
         let pendingRegistrationData = null;
@@ -745,7 +887,7 @@ if (!teacherError && teacher?.name) {
   console.error("Ralat ambil nama guru:", e);
 }
            
-currentUser.name = teacher?.name || namaGuru;
+currentUser.name = namaGuru;
 currentUser.fullName = namaGuru;
                 
                 showApp();
@@ -819,6 +961,9 @@ currentUser.fullName = namaGuru;
                 </button>
                 <button onclick="navigate('analisis')" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all" data-page="analisis">
                     <i data-lucide="bar-chart-3"></i><span>Analisis</span>
+                </button>
+                <button onclick="navigate('slip_pentaksiran')" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all" data-page="slip_pentaksiran">
+                    <i data-lucide="file-text"></i><span>Slip Sumatif</span>
                 </button>`;
             } else if (currentUser.role === 'Guru Kelas') {
                 html += `
@@ -1324,6 +1469,227 @@ currentUser.fullName = namaGuru;
             `;
         }
 
+
+
+        // --- SLIP PENTAKSIRAN SUMATIF A4 POTRET ---
+        const slipSubjects = [
+            'BAHASA MELAYU',
+            'BAHASA INGGERIS',
+            'MATEMATIK',
+            'SAINS',
+            'SEJARAH',
+            'PENDIDIKAN ISLAM',
+            'PENDIDIKAN MORAL',
+            'BAHASA ARAB',
+            'BAHASA IBAN',
+            'PENDIDIKAN SENI VISUAL',
+            'PENDIDIKAN JASMANI DAN KESIHATAN',
+            'MUZIK',
+            'REKA BENTUK TEKNOLOGI'
+        ];
+
+        function getSlipStudent() {
+            return students.find(s => String(s.id) === String(slipSelectedStudentId)) || students[0] || null;
+        }
+
+        function getSlipGender(ic) {
+            const digits = String(ic || '').replace(/\D/g, '');
+            if (!digits) return '-';
+            const last = parseInt(digits.charAt(digits.length - 1), 10);
+            if (Number.isNaN(last)) return '-';
+            return last % 2 === 0 ? 'PEREMPUAN' : 'LELAKI';
+        }
+
+        function getSlipMark(studentId, subject) {
+            const key = `${studentId}_${slipSelectedYear}_${slipSelectedAssessment}_${subject}`;
+            if (studentMarks[key] !== undefined && studentMarks[key] !== null && studentMarks[key] !== '') return studentMarks[key];
+            const row = (markStatusRows || []).find(r =>
+                String(r.student_id) === String(studentId) &&
+                String(r.tahun) === String(slipSelectedYear) &&
+                r.assessment === slipSelectedAssessment &&
+                r.subject === subject
+            );
+            return row ? row.value : '';
+        }
+
+        function getSlipGrade(mark) {
+            if (mark === '' || mark === null || mark === undefined) return 'E';
+            const num = parseFloat(mark);
+            if (Number.isNaN(num)) return 'E';
+            return calculateUASAGrade(num).grade;
+        }
+
+        function getSlipTitle() {
+            if (slipSelectedAssessment === 'UJIAN AKHIR SESI AKADEMIK (UASA)') {
+                return `${slipSelectedAssessment} ${slipSelectedYear}`;
+            }
+            return `${slipSelectedAssessment} ${slipSelectedYear}`;
+        }
+
+        function getStudentTotalForSlip(student) {
+            if (!student) return { total: 0, percent: 0, numericCount: 0 };
+            let total = 0;
+            let numericCount = 0;
+            slipSubjects.forEach(subject => {
+                const mark = getSlipMark(student.id, subject);
+                const num = parseFloat(mark);
+                if (!Number.isNaN(num)) {
+                    total += num;
+                    numericCount++;
+                }
+            });
+            const percent = slipSubjects.length > 0 ? (total / (slipSubjects.length * 100)) * 100 : 0;
+            return { total, percent, numericCount };
+        }
+
+        function getSlipClassRank(student) {
+            if (!student) return '-';
+            const classmates = students.filter(s => s.kelas === student.kelas);
+            const scores = classmates.map(s => ({ id: s.id, total: getStudentTotalForSlip(s).total }))
+                .sort((a, b) => b.total - a.total);
+            const index = scores.findIndex(s => String(s.id) === String(student.id));
+            return index >= 0 ? index + 1 : '-';
+        }
+
+        function printSlipPDF() {
+            const style = document.createElement('style');
+            style.id = 'slip-print-page-style';
+            style.innerHTML = '@page { size: A4 portrait; margin: 10mm; }';
+            document.head.appendChild(style);
+            document.body.classList.add('slip-print-mode');
+            window.print();
+            setTimeout(() => {
+                document.body.classList.remove('slip-print-mode');
+                const el = document.getElementById('slip-print-page-style');
+                if (el) el.remove();
+            }, 500);
+        }
+
+        function renderSlipPentaksiranPage() {
+            const student = getSlipStudent();
+            if (!student) {
+                return `<div class="bg-white p-6 rounded-2xl border border-emerald-100 text-center text-sm font-bold text-slate-500">Tiada data murid. Sila import data murid terlebih dahulu.</div>`;
+            }
+
+            const summary = getStudentTotalForSlip(student);
+            const rank = getSlipClassRank(student);
+            const rows = slipSubjects.map((subject, idx) => {
+                const mark = getSlipMark(student.id, subject);
+                const markText = mark === '' || mark === null || mark === undefined ? '' : mark;
+                return `
+                    <tr>
+                        <td style="width:10mm;">${idx + 1}</td>
+                        <td>${subject}</td>
+                        <td style="width:25mm;">${markText}</td>
+                        <td style="width:22mm;">${getSlipGrade(mark)}</td>
+                    </tr>
+                `;
+            }).join('');
+
+            return `
+                <div class="slip-admin-panel space-y-5">
+                    <div class="slip-control-panel bg-white p-5 rounded-2xl border border-emerald-100 shadow-sm no-print">
+                        <div class="flex flex-col lg:flex-row lg:items-end gap-3">
+                            <div class="flex-1">
+                                <label class="text-[10px] font-black text-slate-400 uppercase">Pilih Murid</label>
+                                <select onchange="slipSelectedStudentId=this.value; renderPage()" class="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-bold outline-none">
+                                    ${students.map(s => `<option value="${s.id}" ${String(s.id)===String(slipSelectedStudentId)?'selected':''}>${s.nama} (${s.kelas})</option>`).join('')}
+                                </select>
+                            </div>
+                            <div>
+                                <label class="text-[10px] font-black text-slate-400 uppercase">Pentaksiran</label>
+                                <select onchange="slipSelectedAssessment=this.value; renderPage()" class="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-bold outline-none">
+                                    ${assessments.map(a => `<option value="${a}" ${slipSelectedAssessment===a?'selected':''}>${a}</option>`).join('')}
+                                </select>
+                            </div>
+                            <div>
+                                <label class="text-[10px] font-black text-slate-400 uppercase">Tahun</label>
+                                <select onchange="slipSelectedYear=this.value; renderPage()" class="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-bold outline-none">
+                                    ${years.map(y => `<option value="${y}" ${slipSelectedYear===y?'selected':''}>${y}</option>`).join('')}
+                                </select>
+                            </div>
+                            <button onclick="printSlipPDF()" class="px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-black flex items-center justify-center gap-2">
+                                <i data-lucide="printer" class="w-4 h-4"></i> Cetak PDF
+                            </button>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
+                            <div>
+                                <label class="text-[10px] font-black text-slate-400 uppercase">Ulasan Guru Kelas</label>
+                                <input value="${slipUlasanGuruKelas}" oninput="slipUlasanGuruKelas=this.value" class="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-semibold outline-none" />
+                            </div>
+                            <div>
+                                <label class="text-[10px] font-black text-slate-400 uppercase">Nama Guru Kelas</label>
+                                <input value="${slipGuruKelasName}" oninput="slipGuruKelasName=this.value" placeholder="Nama Guru Kelas" class="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-semibold outline-none" />
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="slip-a4-page" id="slip-print-area">
+                        <div class="slip-school-header">
+                            <div class="slip-logo-box"><img src="kpm.png" alt="Logo KPM" onerror="this.outerHTML='LOGO<br>KPM'" /></div>
+                            <div class="slip-school-name">
+                                <h1>SEKOLAH KEBANGSAAN BUKIT TONGKAT</h1>
+                                <p>JALAN MAWAR FELDA ULU BELITONG</p>
+                                <p>86000 KLUANG, JOHOR.</p>
+                            </div>
+                            <div class="slip-logo-box"><img src="logo.png" alt="Logo Sekolah" onerror="this.outerHTML='LOGO<br>SEKOLAH'" /></div>
+                        </div>
+
+                        <div class="slip-title-box">SLIP ${getSlipTitle()}</div>
+
+                        <div class="slip-info-grid">
+                            <div>
+                                <div class="slip-info-row"><strong>Nama Murid</strong><span>:</span><span>${student.nama || '-'}</span></div>
+                                <div class="slip-info-row"><strong>No. KP</strong><span>:</span><span>${student.ic || '-'}</span></div>
+                            </div>
+                            <div>
+                                <div class="slip-info-row"><strong>Kelas</strong><span>:</span><span>${student.kelas || '-'}</span></div>
+                                <div class="slip-info-row"><strong>Jantina</strong><span>:</span><span>${getSlipGender(student.ic)}</span></div>
+                            </div>
+                        </div>
+
+                        <table class="slip-result-table">
+                            <thead>
+                                <tr>
+                                    <th>BIL</th>
+                                    <th>MATA PELAJARAN</th>
+                                    <th>MARKAH</th>
+                                    <th>GRED</th>
+                                </tr>
+                            </thead>
+                            <tbody>${rows}</tbody>
+                        </table>
+
+                        <div class="slip-summary-grid">
+                            <div>
+                                <div class="slip-info-row"><strong>Jumlah Markah</strong><span>:</span><span>${summary.total}</span></div>
+                                <div class="slip-info-row"><strong>PERATUS</strong><span>:</span><span>${summary.percent.toFixed(2)}%</span></div>
+                            </div>
+                            <div>
+                                <div class="slip-info-row"><strong>Kedudukan Dalam Kelas</strong><span>:</span><span>${rank}</span></div>
+                            </div>
+                        </div>
+
+                        <div class="slip-ulasan">
+                            <strong>ULASAN GURU KELAS :</strong><br>
+                            <span>${slipUlasanGuruKelas || 'Seorang murid yang rajin dan suka bertanya.'}</span>
+                        </div>
+
+                        <div class="slip-signature-grid">
+                            <div>
+                                <div class="slip-signature-line">GURU BESAR</div>
+                                <div style="font-weight:700; margin-top:3px;">${slipGuruBesarName}</div>
+                            </div>
+                            <div>
+                                <div class="slip-signature-line">GURU KELAS</div>
+                                <div style="font-weight:700; margin-top:3px;">${slipGuruKelasName || '&nbsp;'}</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
         // --- RENDER DYNAMIC PAGES ---
         function renderPage() {
             const content = document.getElementById('page-content');
@@ -1401,6 +1767,11 @@ currentUser.fullName = namaGuru;
                         ${isAdmin ? renderFillingStatusPanel('admin') : ''}
                     </div>
                 `;
+            }
+
+
+            else if (currentPage === 'slip_pentaksiran' && isAdmin) {
+                content.innerHTML = renderSlipPentaksiranPage();
             }
 
             else if (currentPage === 'data_murid' && isAdmin) {
