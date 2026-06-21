@@ -1,236 +1,1985 @@
--- SISMAR Supabase Schema v2
--- Run di Supabase > SQL Editor.
--- Versi ini tidak mengubah struktur asal students, marks dan pbd.
--- Ia hanya tambah jadual rujukan, RLS asas, dan UNIQUE constraint untuk elak rekod berganda.
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistem Pentaksiran SK Bukit Tongkat</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <!-- Supabase SDK -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-create table if not exists students (
-  id bigint primary key,
-  nama text not null,
-  ic text unique not null,
-  kelas text not null,
-  tahun int,
-  updated_at timestamptz default now(),
-  created_at timestamptz default now()
-);
+    <!-- Chart.js & SheetJS (XLSX) Libraries -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
-create table if not exists marks (
-  key text primary key,
-  student_id text not null,
-  tahun text not null,
-  assessment text not null,
-  subject text not null,
-  value numeric,
-  teacher_email text,
-  updated_at timestamptz default now()
-);
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght=300;400;500;600;700;800&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        .hidden { display: none; }
+        #sidebar {
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        #sidebar.closed {
+            transform: translateX(-100%);
+        }
+        .sticky-col {
+            position: sticky;
+            left: 0;
+            background-color: white;
+            z-index: 10;
+        }
+        tr:hover .sticky-col {
+            background-color: #f8fafc !important;
+        }
 
-create table if not exists pbd (
-  key text primary key,
-  student_id text not null,
-  tahun text not null,
-  assessment text not null,
-  subject text not null,
-  value text,
-  teacher_email text,
-  updated_at timestamptz default now()
-);
+        /* --- FORMAT LAPORAN SEKOLAH (EXCEL STYLE - etert.jpg) --- */
+        .excel-report-container {
+            font-family: 'Calibri', 'Arial', sans-serif;
+            color: #000000;
+        }
+        .excel-table {
+            border: 2px solid #000000 !important;
+            border-collapse: collapse;
+            width: 100%;
+        }
+        .excel-table th, .excel-table td {
+            border: 1px solid #000000 !important;
+            padding: 4px 6px;
+            font-size: 11px;
+            text-align: center;
+            font-weight: bold;
+            color: #000000;
+        }
+        .excel-table th {
+            font-weight: bold;
+            background-color: #FFFF00 !important; /* Header Kuning */
+        }
+        
+        /* Lajur Tahun & Bil Murid berlatar biru muda */
+        .excel-bg-blue-year {
+            background-color: #CCFFFF !important;
+            color: #000000 !important;
+        }
+        
+        /* Tajuk mata pelajaran menggunakan warna ungu muda */
+        .excel-bg-purple-subject {
+            background-color: #E2D5F3 !important;
+            color: #000000 !important;
+        }
+        
+        /* Baris JUMLAH menggunakan warna kuning */
+        .excel-bg-yellow-total {
+            background-color: #FFFF00 !important;
+            color: #000000 !important;
+            font-weight: bold;
+        }
 
--- Jadual tambahan. Tidak ganggu struktur asal.
-create table if not exists teachers (
-  id bigserial primary key,
-  name text not null,
-  email text unique not null,
-  role text default 'guru',
-  created_at timestamptz default now(),
-  updated_at timestamptz default now()
-);
+        /* Lajur TP Berwarna Lembut */
+        .tp1-col { background-color: #FFEBEE !important; }
+        .tp2-col { background-color: #FFF3E0 !important; }
+        .tp3-col { background-color: #FFFDE7 !important; }
+        .tp4-col { background-color: #E8F5E9 !important; }
+        .tp5-col { background-color: #E0F2F1 !important; }
+        .tp6-col { background-color: #F3E5F5 !important; }
 
-create table if not exists classes (
-  id bigserial primary key,
-  name text unique not null,
-  year_level int,
-  created_at timestamptz default now()
-);
+        /* --- PRINT MEDIA LAYOUT (A4 LANDSCAPE) --- */
+        @media print {
+            body {
+                background: #ffffff !important;
+                color: #000000 !important;
+            }
+            .no-print {
+                display: none !important;
+            }
+            #print-area, #print-area * {
+                visibility: visible !important;
+            }
+            #print-area {
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 100% !important;
+                padding: 0 !important;
+                margin: 0 !important;
+            }
+            @page {
+                size: A4 landscape;
+                margin: 0.5cm;
+            }
+            tr, th, td, div {
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+        }
+    </style>
+</head>
+<body class="bg-emerald-50/30 min-h-screen">
 
-create table if not exists subjects (
-  id bigserial primary key,
-  name text unique not null,
-  created_at timestamptz default now()
-);
+    <!-- HALAMAN LOGIN -->
+    <div id="login-page" class="min-h-screen bg-emerald-50 flex items-center justify-center p-4">
+        <div class="max-w-md w-full bg-white rounded-2xl shadow-xl overflow-hidden border border-emerald-100">
+            <div class="bg-emerald-600 p-8 text-white text-center">
+                <div class="bg-white w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg overflow-hidden border-2 border-white">
+                    <img src="logo.png" alt="Logo SK Bukit Tongkat" class="w-20 h-20 object-contain" onerror="this.src='https://placehold.co/100x100?text=LOGO'">
+                </div>
+                <h1 class="text-2xl font-bold uppercase tracking-tight">SISMAR</h1>
+                <p class="opacity-80">SK Bukit Tongkat (JBA2054)</p>
+            </div>
+            
+            <div class="p-8 space-y-6">
+                <div id="login-error" class="hidden bg-red-50 text-red-600 p-3 rounded-lg text-sm border border-red-100"></div>
+                <form id="login-form" class="space-y-5" onsubmit="event.preventDefault();">
+                    <div class="space-y-2">
+                        <label class="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                            <i data-lucide="user" class="w-4 h-4"></i> Emel DELIMa
+                        </label>
+                        <input id="email" type="email" required class="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none text-sm" placeholder="g-xxxxxxxx@moe-dl.edu.my">
+                    </div>
+                    <div class="space-y-2">
+                        <label class="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                            <i data-lucide="lock" class="w-4 h-4"></i> Kata Laluan
+                        </label>
+                        <input id="password" type="password" required class="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none text-sm" placeholder="********">
+                    </div>
+                    <div class="grid grid-cols-1 gap-3">
+                        <button type="button" onclick="handleLogin('guru')" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-xl transition-all shadow-md">
+                            Log Masuk Guru
+                        </button>
+                        <button type="button" onclick="handleLogin('guru_kelas')" class="w-full bg-teal-600 hover:bg-teal-700 text-white font-bold py-3 rounded-xl transition-all shadow-md flex items-center justify-center gap-2">
+                            <i data-lucide="presentation" class="w-5 h-5"></i> Log Masuk Guru Kelas
+                        </button>
+                        <button type="button" onclick="handleLogin('admin')" class="w-full bg-slate-800 hover:bg-slate-900 text-white font-semibold py-3 rounded-xl transition-all flex items-center justify-center gap-2">
+                            <i data-lucide="shield-check" class="w-5 h-5"></i> Admin
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
 
-create table if not exists exams (
-  id bigserial primary key,
-  name text unique not null,
-  year text default '2026',
-  created_at timestamptz default now()
-);
+    <!-- TATA LETAK UTAMA APLIKASI -->
+    <div id="app-container" class="hidden min-h-screen flex">
+        <!-- Sidebar Toggle Overlay -->
+        <div id="sidebar-overlay" onclick="toggleSidebar()" class="hidden fixed inset-0 bg-black/50 z-40"></div>
 
--- UNIQUE constraint untuk elak markah dan PBD berganda.
--- Jika constraint sudah wujud, ia akan dilangkau.
-do $$
-begin
-  if not exists (
-    select 1 from pg_constraint where conname = 'marks_unique'
-  ) then
-    alter table marks
-    add constraint marks_unique unique(student_id, tahun, assessment, subject);
-  end if;
-end $$;
+        <!-- Sidebar -->
+        <aside id="sidebar" class="fixed inset-y-0 left-0 w-64 bg-white border-r border-emerald-100 flex flex-col p-6 shadow-sm shrink-0 z-50 closed">
+            <div class="flex items-center justify-between mb-10 px-2 lg:block">
+                <div class="flex items-center gap-3">
+                    <div class="bg-white p-1 rounded-lg shadow-sm border border-emerald-100 shrink-0">
+                        <img src="logo.png" alt="Logo" class="w-10 h-10 object-contain" onerror="this.src='https://placehold.co/40x40?text=LOGO'">
+                    </div>
+                    <span class="font-bold text-gray-800 text-lg uppercase leading-tight">SK Bukit<br/>Tongkat</span>
+                </div>
+                <button onclick="toggleSidebar()" class="p-2 text-gray-400 hover:bg-emerald-50 hover:text-emerald-700 rounded-xl transition-all" title="Tutup Menu">
+                    <i data-lucide="panel-left-close" class="w-5 h-5"></i>
+                </button>
+            </div>
+            
+            <nav id="nav-menu" class="space-y-2 flex-grow">
+                <!-- Item Navigasi Dimuat Dinamis -->
+            </nav>
 
-do $$
-begin
-  if not exists (
-    select 1 from pg_constraint where conname = 'pbd_unique'
-  ) then
-    alter table pbd
-    add constraint pbd_unique unique(student_id, tahun, assessment, subject);
-  end if;
-end $$;
+            <div class="mt-auto pt-6 border-t border-emerald-50">
+                <div class="flex items-center gap-3 mb-4 px-2">
+                    <div id="user-avatar" class="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold shadow-sm animate-pulse"></div>
+                    <div class="overflow-hidden">
+                        <p id="user-name-display" class="text-sm font-bold text-gray-800 truncate"></p>
+                        <p id="user-role-display" class="text-[10px] font-bold uppercase text-gray-400"></p>
+                    </div>
+                </div>
+                <button onclick="handleLogout()" class="w-full flex items-center gap-3 px-4 py-2 text-red-500 hover:bg-red-50 rounded-xl transition-all font-semibold text-sm">
+                    <i data-lucide="log-out" class="w-4 h-4"></i> Log Keluar
+                </button>
+            </div>
+        </aside>
 
-alter table students enable row level security;
-alter table marks enable row level security;
-alter table pbd enable row level security;
-alter table teachers enable row level security;
-alter table classes enable row level security;
-alter table subjects enable row level security;
-alter table exams enable row level security;
+        <!-- Area Konten -->
+        <main class="flex-grow flex flex-col h-screen w-full min-w-0">
+            <header class="h-16 bg-white border-b border-emerald-100 flex items-center justify-between px-4 md:px-8 shrink-0 shadow-sm z-30 font-bold">
+                <div class="flex items-center gap-3">
+                    <button onclick="toggleSidebar()" class="p-2 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-xl transition-all focus:outline-none flex items-center gap-1.5 px-3 border border-emerald-200" title="Togol Bar Sisi">
+                        <i data-lucide="panel-left" class="w-5 h-5"></i>
+                        <span class="text-xs font-bold uppercase tracking-wider hidden sm:inline">Menu</span>
+                    </button>
+                    <h2 id="page-title" class="font-bold text-gray-800 text-lg md:text-xl capitalize truncate">Dashboard</h2>
+                </div>
+                <div id="admin-indicator" class="hidden shrink-0">
+                    <span class="bg-slate-800 text-white text-[9px] md:text-[10px] px-2 py-1 rounded font-bold uppercase tracking-wider">Admin Mode</span>
+                </div>
+            </header>
 
--- Polisi asas untuk guru yang login.
--- Untuk ujian awal, semua akaun authenticated boleh baca dan simpan.
--- Selepas sistem stabil, polisi boleh diketatkan ikut kelas/subjek guru.
+            <div id="page-content" class="p-4 md:p-8 overflow-y-auto flex-grow">
+                <!-- Konten Halaman Dinamis -->
+            </div>
+        </main>
+    </div>
 
-drop policy if exists "authenticated read students" on students;
-create policy "authenticated read students"
-on students for select
-to authenticated
-using (true);
+    <!-- MODAL KONFIRMASI KUSTOM -->
+    <div id="confirm-modal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl border border-slate-100 space-y-4 transform transition-all scale-100">
+            <div class="flex items-center gap-3 text-amber-500">
+                <div class="bg-amber-50 p-2.5 rounded-full"><i data-lucide="help-circle" class="w-6 h-6"></i></div>
+                <h3 class="font-bold text-slate-800 text-lg">Adakah anda yakin?</h3>
+            </div>
+            <p class="text-xs text-slate-500 font-medium leading-relaxed">Adakah anda pasti untuk mendaftar murid ini ke dalam sistem?</p>
+            <div class="flex items-center justify-end gap-2.5 pt-2">
+                <button onclick="closeConfirmModal(false)" class="px-4 py-2 text-xs font-bold text-slate-500 bg-slate-50 hover:bg-slate-100 rounded-xl transition-all">Tidak</button>
+                <button onclick="closeConfirmModal(true)" class="px-5 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl transition-all shadow-md">Ya</button>
+            </div>
+        </div>
+    </div>
 
-drop policy if exists "authenticated upsert students" on students;
-create policy "authenticated upsert students"
-on students for insert
-to authenticated
-with check (true);
+    <!-- NOTIFIKASI TOAST -->
+    <div id="toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 pointer-events-none"></div>
 
-drop policy if exists "authenticated update students" on students;
-create policy "authenticated update students"
-on students for update
-to authenticated
-using (true)
-with check (true);
+    <script>
+        // --- DATA & STATE ---
+        // --- SUPABASE CONFIG ---
+        // GANTI dengan Project URL dan Anon Key daripada Supabase > Project Settings > API.
+        const SUPABASE_URL = "https://zrjqqfalpmwfvacqscnf.supabase.co";
+        const SUPABASE_ANON_KEY = "PASTE_ANON_PUBLIC_KEY_DeyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpyanFxZmFscG13dmZhY3FzY25mIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc0MzA2NDgsImV4cCI6MjA5MzAwNjY0OH0.ZvoqRTy1d3iyjC1O_9ePR8LDHS7skjA-eprCHu9es3oI_SINI";
 
-drop policy if exists "authenticated delete students" on students;
-create policy "authenticated delete students"
-on students for delete
-to authenticated
-using (true);
+        let supabase = null;
+        let supabaseEnabled = false;
 
-drop policy if exists "authenticated read marks" on marks;
-create policy "authenticated read marks"
-on marks for select
-to authenticated
-using (true);
+        // Roster Murid Merentasi Tahun 1 hingga Tahun 6 (Data Contoh Mantap)
+        const students = [
+            // Tahun 1
+            { id: 1, nama: 'AHMAD BIN ZULKIFLI', ic: '190215-01-0873', kelas: '1 AR-RAZI' },
+            { id: 15, nama: 'KHAIRUL ANUAR BIN ABDULLAH', ic: '141011-01-1551', kelas: '6 AR-RAZI' }
+        ];
 
-drop policy if exists "authenticated upsert marks" on marks;
-create policy "authenticated upsert marks"
-on marks for insert
-to authenticated
-with check (true);
+        const years = ['2026', '2027', '2028'];
+        const classes = [
+            '1 AR-RAZI', '1 AL-KHAWARIZMI', '2 AR-RAZI', '2 AL-KHAWARIZMI',
+            '3 AR-RAZI', '3 AL-KHAWARIZMI', '4 AR-RAZI', '4 AL-KHAWARIZMI',
+            '5 AR-RAZI', '6 AR-RAZI', '6 AL-KHAWARIZMI',
+        ];
+        const assessments = ['PENTAKSIRAN SUMATIF 1', 'PENTAKSIRAN SUMATIF 2', 'UJIAN AKHIR SESI AKADEMIK (UASA)'];
+        
+        // 9 Matapelajaran mengikut etert.jpg
+        const baseSubjects = [
+            'BAHASA ARAB', 'BAHASA INGGERIS', 'BAHASA MELAYU', 'MATEMATIK', 'SAINS', 
+            'PENDIDIKAN ISLAM', 'PENDIDIKAN JASMANI DAN KESIHATAN', 'MUZIK', 'PENDIDIKAN SENI VISUAL', 'SEJARAH', 'REKA BENTUK TEKNOLOGI'
+        ];
 
-drop policy if exists "authenticated update marks" on marks;
-create policy "authenticated update marks"
-on marks for update
-to authenticated
-using (true)
-with check (true);
+        const teachers = [
+            'MAZUIN BINTI AHMAD KAMIL', 'MOHD KAMAL BIN MOHD SHAH', 'NOR AZAH BINTI MORI',
+            'MOHD FAEIZ BIN SANUSI', 'KHAIRULAZMAN BIN DOLLAH', 'ZULKARNAIN BIN M. AYOB',
+            'MOHD NOOR RASHID BIN WAGIMAN', 'MOHD HIJRAN BIN AHMAD IDRUS', 'MUZAFFAR AHMAD BIN ZAINAL ABIDIN',
+            'NORSAADAH BINTI JAILANI', 'NORMAZIDA BINTI AHMAD', 'RUMINI BINTI TUKIMAN',
+            'PSPA LAILA BINTI OTHMAN', 'NORAZLINAWATI BINTI MAHMOOM', 'NURUL NAJIHAH BINTI SAHLAN',
+            'ADLIN FAZLINDA BINTI ASNAN', 'SYAHMINA WARDAH BINTI SUARDI', 'ROSELINDA BINTI LAZIM',
+            'DAYANG NURFARAHAIN FAEEZA BINTI HASSIM', 'NORZAIMAH BINTI ZAKARIA', 'RAZIDAH BINTI MOHAMAD',
+            'NOOR HASLINDA BT. MOHD NASIRAN', 'SITI NOOR FAKHARIYAH BINTI MD SHAHID', 'VEETIYAH A/P SUROMUTHU'
+        ];
 
-drop policy if exists "authenticated read pbd" on pbd;
-create policy "authenticated read pbd"
-on pbd for select
-to authenticated
-using (true);
+        // Database Markah Sementara (In-Memory)
+        const studentMarks = {
+            '14_2026_PENTAKSIRAN SUMATIF 1_BAHASA MELAYU': 85,
+            '14_2026_PENTAKSIRAN SUMATIF 1_BAHASA INGGERIS': 78,
+            '14_2026_PENTAKSIRAN SUMATIF 1_SAINS': 92,
+            '14_2026_PENTAKSIRAN SUMATIF 1_MATEMATIK': 68,
+            '14_2026_PENTAKSIRAN SUMATIF 1_PENDIDIKAN ISLAM': 80,
+            '14_2026_PENTAKSIRAN SUMATIF 1_BAHASA ARAB': 75,
+            '14_2026_PENTAKSIRAN SUMATIF 1_PENDIDIKAN JASMANI DAN KESIHATAN': 90,
+            '14_2026_PENTAKSIRAN SUMATIF 1_PENDIDIKAN SENI VISUAL': 82,
+            
+            '15_2026_PENTAKSIRAN SUMATIF 1_BAHASA MELAYU': 55,
+            '15_2026_PENTAKSIRAN SUMATIF 1_BAHASA INGGERIS': 40,
+            '15_2026_PENTAKSIRAN SUMATIF 1_SAINS': 33,
+            '15_2026_PENTAKSIRAN SUMATIF 1_MATEMATIK': 10
+        };
 
-drop policy if exists "authenticated upsert pbd" on pbd;
-create policy "authenticated upsert pbd"
-on pbd for insert
-to authenticated
-with check (true);
+        // Database PBD Semasa Sementara (In-Memory) yang merangkumi Tahun 1 - 6
+        const studentPBD = {
+            // Tahun 1
+            '1_2026_PENTAKSIRAN SUMATIF 1_BAHASA ARAB': 'TP4', '1_2026_PENTAKSIRAN SUMATIF 1_BAHASA INGGERIS': 'TP5', '1_2026_PENTAKSIRAN SUMATIF 1_BAHASA MELAYU': 'TP4', '1_2026_PENTAKSIRAN SUMATIF 1_MATEMATIK': 'TP5', '1_2026_PENTAKSIRAN SUMATIF 1_SAINS': 'TP4', '1_2026_PENTAKSIRAN SUMATIF 1_PENDIDIKAN ISLAM': 'TP5', '1_2026_PENTAKSIRAN SUMATIF 1_PENDIDIKAN JASMANI DAN KESIHATAN': 'TP6', '1_2026_PENTAKSIRAN SUMATIF 1_MUZIK': 'TP4', '1_2026_PENTAKSIRAN SUMATIF 1_PENDIDIKAN SENI VISUAL': 'TP5',
+            '2_2026_PENTAKSIRAN SUMATIF 1_BAHASA ARAB': 'TP3', '2_2026_PENTAKSIRAN SUMATIF 1_BAHASA INGGERIS': 'TP4', '2_2026_PENTAKSIRAN SUMATIF 1_BAHASA MELAYU': 'TP3', '2_2026_PENTAKSIRAN SUMATIF 1_MATEMATIK': 'TP4', '2_2026_PENTAKSIRAN SUMATIF 1_SAINS': 'TP5', '2_2026_PENTAKSIRAN SUMATIF 1_PENDIDIKAN ISLAM': 'TP3', '2_2026_PENTAKSIRAN SUMATIF 1_PENDIDIKAN JASMANI DAN KESIHATAN': 'TP4', '2_2026_PENTAKSIRAN SUMATIF 1_MUZIK': 'TP5', '2_2026_PENTAKSIRAN SUMATIF 1_PENDIDIKAN SENI VISUAL': 'TP4',
+            '3_2026_PENTAKSIRAN SUMATIF 1_BAHASA ARAB': 'TP2', '3_2026_PENTAKSIRAN SUMATIF 1_BAHASA INGGERIS': 'TP3', '3_2026_PENTAKSIRAN SUMATIF 1_BAHASA MELAYU': 'TP2', '3_2026_PENTAKSIRAN SUMATIF 1_MATEMATIK': 'TP3', '3_2026_PENTAKSIRAN SUMATIF 1_SAINS': 'TP4', '3_2026_PENTAKSIRAN SUMATIF 1_PENDIDIKAN ISLAM': 'TP4', '3_2026_PENTAKSIRAN SUMATIF 1_PENDIDIKAN JASMANI DAN KESIHATAN': 'TP5', '3_2026_PENTAKSIRAN SUMATIF 1_MUZIK': 'TP3', '3_2026_PENTAKSIRAN SUMATIF 1_PENDIDIKAN SENI VISUAL': 'TP3',
+            '4_2026_PENTAKSIRAN SUMATIF 1_BAHASA ARAB': 'TP5', '4_2026_PENTAKSIRAN SUMATIF 1_BAHASA INGGERIS': 'TP4', '4_2026_PENTAKSIRAN SUMATIF 1_BAHASA MELAYU': 'TP5', '4_2026_PENTAKSIRAN SUMATIF 1_MATEMATIK': 'TP4', '4_2026_PENTAKSIRAN SUMATIF 1_SAINS': 'TP5', '4_2026_PENTAKSIRAN SUMATIF 1_PENDIDIKAN ISLAM': 'TP5', '4_2026_PENTAKSIRAN SUMATIF 1_PENDIDIKAN JASMANI DAN KESIHATAN': 'TP6', '4_2026_PENTAKSIRAN SUMATIF 1_MUZIK': 'TP5', '4_2026_PENTAKSIRAN SUMATIF 1_PENDIDIKAN SENI VISUAL': 'TP4',
+            '5_2026_PENTAKSIRAN SUMATIF 1_BAHASA ARAB': 'TP3', '5_2026_PENTAKSIRAN SUMATIF 1_BAHASA INGGERIS': 'TP3', '5_2026_PENTAKSIRAN SUMATIF 1_BAHASA MELAYU': 'TP3', '5_2026_PENTAKSIRAN SUMATIF 1_MATEMATIK': 'TP2', '5_2026_PENTAKSIRAN SUMATIF 1_SAINS': 'TP3', '5_2026_PENTAKSIRAN SUMATIF 1_PENDIDIKAN ISLAM': 'TP3', '5_2026_PENTAKSIRAN SUMATIF 1_PENDIDIKAN JASMANI DAN KESIHATAN': 'TP4', '5_2026_PENTAKSIRAN SUMATIF 1_MUZIK': 'TP4', '5_2026_PENTAKSIRAN SUMATIF 1_PENDIDIKAN SENI VISUAL': 'TP3',
+            // Tahun 2
+            '6_2026_PENTAKSIRAN SUMATIF 1_BAHASA ARAB': 'TP4', '6_2026_PENTAKSIRAN SUMATIF 1_BAHASA MELAYU': 'TP5', '7_2026_PENTAKSIRAN SUMATIF 1_BAHASA INGGERIS': 'TP3',
+            // Tahun 3
+            '9_2026_PENTAKSIRAN SUMATIF 1_BAHASA MELAYU': 'TP3', '10_2026_PENTAKSIRAN SUMATIF 1_MATEMATIK': 'TP4',
+            // Tahun 4
+            '11_2026_PENTAKSIRAN SUMATIF 1_BAHASA ARAB': 'TP5', '12_2026_PENTAKSIRAN SUMATIF 1_SAINS': 'TP3',
+            // Tahun 5
+            '13_2026_PENTAKSIRAN SUMATIF 1_BAHASA MELAYU': 'TP4', '13_2026_PENTAKSIRAN SUMATIF 1_BAHASA INGGERIS': 'TP4',
+            // Tahun 6
+            '14_2026_PENTAKSIRAN SUMATIF 1_BAHASA MELAYU': 'TP5', '14_2026_PENTAKSIRAN SUMATIF 1_BAHASA INGGERIS': 'TP4', '15_2026_PENTAKSIRAN SUMATIF 1_BAHASA MELAYU': 'TP3'
+        };
 
-drop policy if exists "authenticated update pbd" on pbd;
-create policy "authenticated update pbd"
-on pbd for update
-to authenticated
-using (true)
-with check (true);
+        let currentUser = null;
+        let isAdmin = false;
+        let currentPage = 'dashboard';
+        let isEditMode = true; 
+        let searchQuery = ''; 
 
--- Polisi jadual tambahan.
-drop policy if exists "authenticated read teachers" on teachers;
-create policy "authenticated read teachers"
-on teachers for select
-to authenticated
-using (true);
+        // State filter
+        let selectedYear = '2026';
+        let selectedClass = '1 AR-RAZI';
+        let selectedAssessment = 'PENTAKSIRAN SUMATIF 1';
+        let selectedSubject = 'BAHASA ARAB';
+        let selectedTeacher = 'MAZUIN BINTI AHMAD KAMIL';
 
-drop policy if exists "authenticated insert teachers" on teachers;
-create policy "authenticated insert teachers"
-on teachers for insert
-to authenticated
-with check (true);
+        // State modul analisis
+        let analysisSelectedAssessment = 'PENTAKSIRAN SUMATIF 1';
+        let analysisSelectedMode = 'overall_pbd_report'; // 'overall_pbd_report' | 'pbd_excel_dashboard' | 'individu' | 'pbd_ringkasan'
+        let analysisSelectedStudentId = 1; 
+        let analysisSelectedClass = '1 AR-RAZI';
+        let analysisSelectedYearPBD = '1';
+        let analysisSelectedSessionPBD = 'PSA';
+        let analysisSelectedAcademicYearPBD = '2026';
 
-drop policy if exists "authenticated update teachers" on teachers;
-create policy "authenticated update teachers"
-on teachers for update
-to authenticated
-using (true)
-with check (true);
+        // State pendaftaran & CSV
+        let pendingRegistrationData = null;
+        let tempUploadedStudents = [];
+        // --- SUPABASE DATABASE SETUP ---
+        function parseKey(key) {
+            const parts = String(key).split('_');
+            return {
+                student_id: parts[0] || '',
+                tahun: parts[1] || '',
+                assessment: parts[2] || '',
+                subject: parts.slice(3).join('_') || ''
+            };
+        }
 
-drop policy if exists "authenticated read classes" on classes;
-create policy "authenticated read classes"
-on classes for select
-to authenticated
-using (true);
+        function getStudentYear(kelas) {
+            return parseInt(String(kelas || '').charAt(0), 10) || null;
+        }
 
-drop policy if exists "authenticated read subjects" on subjects;
-create policy "authenticated read subjects"
-on subjects for select
-to authenticated
-using (true);
+        async function initSupabase() {
+            try {
+                if (!SUPABASE_URL || !SUPABASE_ANON_KEY || SUPABASE_ANON_KEY.includes('PASTE_')) {
+                    console.warn('Supabase URL / Anon Key belum lengkap. Sistem berjalan dalam mod tempatan.');
+                    supabaseEnabled = false;
+                    return;
+                }
 
-drop policy if exists "authenticated read exams" on exams;
-create policy "authenticated read exams"
-on exams for select
-to authenticated
-using (true);
+                supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+                    auth: {
+                        persistSession: true,
+                        autoRefreshToken: true,
+                        detectSessionInUrl: true
+                    }
+                });
 
--- Data rujukan asas. Tidak wajib, tetapi memudahkan dropdown jika mahu guna kemudian.
-insert into exams(name, year) values
-('PENTAKSIRAN SUMATIF 1', '2026'),
-('PENTAKSIRAN SUMATIF 2', '2026'),
-('UJIAN AKHIR SESI AKADEMIK (UASA)', '2026')
-on conflict (name) do nothing;
+                supabaseEnabled = true;
+                await fetchAllDataFromSupabase();
+                console.log('Supabase initialized successfully');
+            } catch (e) {
+                supabaseEnabled = false;
+                console.error('Supabase connection error:', e);
+            }
+        }
 
-insert into classes(name, year_level) values
-('1 AR-RAZI', 1),
-('1 AL-KHAWARIZMI', 1),
-('2 AR-RAZI', 2),
-('2 AL-KHAWARIZMI', 2),
-('3 AR-RAZI', 3),
-('3 AL-KHAWARIZMI', 3),
-('4 AR-RAZI', 4),
-('4 AL-KHAWARIZMI', 4),
-('5 AR-RAZI', 5),
-('6 AR-RAZI', 6),
-('6 AL-KHAWARIZMI', 6)
-on conflict (name) do nothing;
+        async function fetchAllDataFromSupabase() {
+            if (!supabaseEnabled || !supabase) return;
+            try {
+                const { data: studentRows, error: studentError } = await supabase
+                    .from('students')
+                    .select('id,nama,ic,kelas')
+                    .order('kelas', { ascending: true })
+                    .order('nama', { ascending: true });
 
-insert into subjects(name) values
-('BAHASA ARAB'),
-('BAHASA INGGERIS'),
-('BAHASA MELAYU'),
-('MATEMATIK'),
-('SAINS'),
-('PENDIDIKAN ISLAM'),
-('PENDIDIKAN JASMANI DAN KESIHATAN'),
-('MUZIK'),
-('PENDIDIKAN SENI VISUAL'),
-('SEJARAH'),
-('REKA BENTUK TEKNOLOGI')
-on conflict (name) do nothing;
+                if (studentError) throw studentError;
+                if (studentRows && studentRows.length > 0) {
+                    students.length = 0;
+                    studentRows.forEach(row => {
+                        students.push({
+                            id: row.id,
+                            nama: row.nama,
+                            ic: row.ic,
+                            kelas: row.kelas
+                        });
+                    });
+                }
+
+                const { data: markRows, error: markError } = await supabase
+                    .from('marks')
+                    .select('key,value');
+                if (markError) throw markError;
+                if (markRows) {
+                    Object.keys(studentMarks).forEach(k => delete studentMarks[k]);
+                    markRows.forEach(row => {
+                        if (row.key) studentMarks[row.key] = row.value;
+                    });
+                }
+
+                const { data: pbdRows, error: pbdError } = await supabase
+                    .from('pbd')
+                    .select('key,value');
+                if (pbdError) throw pbdError;
+                if (pbdRows) {
+                    Object.keys(studentPBD).forEach(k => delete studentPBD[k]);
+                    pbdRows.forEach(row => {
+                        if (row.key) studentPBD[row.key] = row.value;
+                    });
+                }
+            } catch (e) {
+                console.error('Error retrieving Supabase data:', e);
+                showToast('Gagal ambil data Supabase. Semak RLS atau jadual.', 'danger');
+            }
+        }
+
+        async function persistStudentToSupabase(student) {
+            if (!supabaseEnabled || !supabase) return;
+            try {
+                const { error } = await supabase
+                    .from('students')
+                    .upsert({
+                        id: student.id,
+                        nama: student.nama,
+                        ic: student.ic,
+                        kelas: student.kelas,
+                        tahun: getStudentYear(student.kelas),
+                        updated_at: new Date().toISOString()
+                    }, { onConflict: 'ic' });
+                if (error) throw error;
+            } catch (e) {
+                console.error('Failed to persist student:', e);
+                showToast('Gagal simpan murid ke Supabase.', 'danger');
+            }
+        }
+
+        async function persistStudentsBulkToSupabase(studentList) {
+            if (!supabaseEnabled || !supabase || studentList.length === 0) return;
+            try {
+                const rows = studentList.map(student => ({
+                    id: student.id,
+                    nama: student.nama,
+                    ic: student.ic,
+                    kelas: student.kelas,
+                    tahun: getStudentYear(student.kelas),
+                    updated_at: new Date().toISOString()
+                }));
+
+                const { error } = await supabase
+                    .from('students')
+                    .upsert(rows, { onConflict: 'ic' });
+                if (error) throw error;
+            } catch (e) {
+                console.error('Failed bulk import students:', e);
+                showToast('Gagal upload CSV ke Supabase.', 'danger');
+            }
+        }
+
+        async function deleteStudentFromSupabase(id) {
+            if (!supabaseEnabled || !supabase) return;
+            try {
+                const { error } = await supabase
+                    .from('students')
+                    .delete()
+                    .eq('id', id);
+                if (error) throw error;
+            } catch (e) {
+                console.error('Failed to delete student:', e);
+                showToast('Gagal padam murid di Supabase.', 'danger');
+            }
+        }
+
+        async function persistMarksBulkToSupabase(markRows, pbdRows) {
+            if (!supabaseEnabled || !supabase) return;
+            try {
+                if (markRows.length > 0) {
+                    const { error } = await supabase
+                        .from('marks')
+                        .upsert(markRows, { onConflict: 'student_id,tahun,assessment,subject' });
+                    if (error) throw error;
+                }
+                if (pbdRows.length > 0) {
+                    const { error } = await supabase
+                        .from('pbd')
+                        .upsert(pbdRows, { onConflict: 'student_id,tahun,assessment,subject' });
+                    if (error) throw error;
+                }
+            } catch (e) {
+                console.error('Failed to save marks / pbd:', e);
+                showToast('Gagal simpan markah ke Supabase.', 'danger');
+            }
+        }
+
+        // --- PENGIRAAN STATISTIK PBD AUTOMATIK ---
+        function calculatePBDStatsForYear(yearNum) {
+            const result = {};
+            const activeStudents = students.filter(s => s.kelas.startsWith(yearNum + ' '));
+
+            baseSubjects.forEach(sub => {
+                result[sub] = {
+                    'AL-KHAWARIZMI': { TP1: 0, TP2: 0, TP3: 0, TP4: 0, TP5: 0, TP6: 0, Total: 0 },
+                    'AR-RAZI': { TP1: 0, TP2: 0, TP3: 0, TP4: 0, TP5: 0, TP6: 0, Total: 0 },
+                    'JUMLAH': { TP1: 0, TP2: 0, TP3: 0, TP4: 0, TP5: 0, TP6: 0, Total: 0 }
+                };
+
+                activeStudents.forEach(s => {
+                    const classKey = s.kelas.includes('AL-KHAWARIZMI') ? 'AL-KHAWARIZMI' : 'AR-RAZI';
+                    const key = `${s.id}_${analysisSelectedAcademicYearPBD}_${analysisSelectedAssessment}_${sub}`;
+                    const tp = studentPBD[key];
+
+                    if (tp && ['TP1', 'TP2', 'TP3', 'TP4', 'TP5', 'TP6'].includes(tp)) {
+                        result[sub][classKey][tp]++;
+                        result[sub][classKey].Total++;
+                        result[sub]['JUMLAH'][tp]++;
+                        result[sub]['JUMLAH'].Total++;
+                    }
+                });
+            });
+
+            return result;
+        }
+
+        // --- FUNGSI JANA RUMUSAN AUTOMATIK ---
+        function generateAutomaticSummary(stats) {
+            let bestSubject = '-';
+            let bestScore = -1;
+            let weakestSubject = '-';
+            let weakestScore = 9999;
+
+            baseSubjects.forEach(sub => {
+                const data = stats[sub]['JUMLAH'];
+                if (data.Total > 0) {
+                    const menguasai = data.TP3 + data.TP4 + data.TP5 + data.TP6;
+                    const pct = (menguasai / data.Total) * 100;
+                    if (pct > bestScore) {
+                        bestScore = pct;
+                        bestSubject = sub;
+                    }
+                    if (pct < weakestScore) {
+                        weakestScore = pct;
+                        weakestSubject = sub;
+                    }
+                }
+            });
+
+            if (bestScore === -1) bestSubject = "Tiada Data";
+            if (weakestScore === 9999) weakestSubject = "Tiada Data";
+
+            return {
+                bestSubject,
+                weakestSubject,
+                bestClass: "1 AR-RAZI",
+                interventionClass: "1 AL-KHAWARIZMI",
+                suggestions: [
+                    "Menjalankan bimbingan berfokus (PLC) bagi subjek " + (weakestSubject !== "Tiada Data" ? weakestSubject : "yang dikenal pasti lemah") + ".",
+                    "Memantapkan pelaksanaan aktiviti interaktif dan intervensi dalam bilik darjah.",
+                    "Sesi perkongsian amalan terbaik di antara guru pentaksir subjek utama."
+                ]
+            };
+        }
+
+        // --- EXPORT TO EXCEL (.XLSX) ---
+        function exportExcelReport() {
+            try {
+                const wb = XLSX.utils.book_new();
+
+                ['1', '2', '3', '4', '5', '6'].forEach(yr => {
+                    const wsData = [];
+                    wsData.push(["ANALISIS PENTAKSIRAN BILIK DARJAH (PBD)"]);
+                    wsData.push([`SESI AKADEMIK ${analysisSelectedAcademicYearPBD}`]);
+                    wsData.push([`MENGIKUT KELAS TAHUN ${yr}`]);
+                    wsData.push([]);
+
+                    const stats = calculatePBDStatsForYear(yr);
+
+                    baseSubjects.forEach(sub => {
+                        wsData.push([sub]);
+                        wsData.push(["Bil", "Kelas", "TP1", "%", "TP2", "%", "TP3", "%", "TP4", "%", "TP5", "%", "TP6", "%", "Jumlah"]);
+
+                        ['AL-KHAWARIZMI', 'AR-RAZI'].forEach((cls, idx) => {
+                            const d = stats[sub][cls];
+                            const tot = d.Total || 1;
+                            wsData.push([
+                                idx + 1,
+                                cls,
+                                d.TP1, ((d.TP1 / tot) * 100).toFixed(1) + "%",
+                                d.TP2, ((d.TP2 / tot) * 100).toFixed(1) + "%",
+                                d.TP3, ((d.TP3 / tot) * 100).toFixed(1) + "%",
+                                d.TP4, ((d.TP4 / tot) * 100).toFixed(1) + "%",
+                                d.TP5, ((d.TP5 / tot) * 100).toFixed(1) + "%",
+                                d.TP6, ((d.TP6 / tot) * 100).toFixed(1) + "%",
+                                d.Total
+                            ]);
+                        });
+
+                        const j = stats[sub]['JUMLAH'];
+                        const jtot = j.Total || 1;
+                        wsData.push([
+                            "",
+                            "JUMLAH",
+                            j.TP1, ((j.TP1 / jtot) * 100).toFixed(1) + "%",
+                            j.TP2, ((j.TP2 / jtot) * 100).toFixed(1) + "%",
+                            j.TP3, ((j.TP3 / jtot) * 100).toFixed(1) + "%",
+                            j.TP4, ((j.TP4 / jtot) * 100).toFixed(1) + "%",
+                            j.TP5, ((j.TP5 / jtot) * 100).toFixed(1) + "%",
+                            j.TP6, ((j.TP6 / jtot) * 100).toFixed(1) + "%",
+                            j.Total
+                        ]);
+                        wsData.push([]); 
+                    });
+
+                    const ws = XLSX.utils.aoa_to_sheet(wsData);
+                    XLSX.utils.book_append_sheet(wb, ws, `Tahun ${yr}`);
+                });
+
+                XLSX.writeFile(wb, `Analisis_PBD_${analysisSelectedAcademicYearPBD}.xlsx`);
+                showToast("Laporan Excel berjaya dieksport!", "success");
+            } catch (err) {
+                console.error("Gagal eksport Excel:", err);
+                showToast("Ralat sistem semasa mengeksport laporan.", "danger");
+            }
+        }
+
+        // --- EXPORT KESELURUHAN (etert.jpg) TO EXCEL ---
+        function exportOverallExcel() {
+            try {
+                const table = document.getElementById("overall-excel-table");
+                const wb = XLSX.utils.table_to_book(table, { raw: true });
+                XLSX.writeFile(wb, `Analisis_PBD_Keseluruhan_Tahun_1_6_${analysisSelectedAcademicYearPBD}.xlsx`);
+                showToast("Laporan Keseluruhan berjaya dieksport ke Excel!", "success");
+            } catch (err) {
+                console.error("Gagal eksport:", err);
+                showToast("Ralat eksport fail.", "danger");
+            }
+        }
+
+        // --- INTERACTION & PRINT TRIGGERS ---
+        function printReport() {
+            window.print();
+        }
+
+        // --- HANDLERS ---
+        async function handleLogin(type) {
+            const email = document.getElementById('email').value.trim();
+            const password = document.getElementById('password').value;
+            const errorDiv = document.getElementById('login-error');
+
+            errorDiv.classList.add('hidden');
+
+            if (!email || !password) {
+                showError('Sila masukkan emel dan kata laluan.');
+                return;
+            }
+
+            if (!email.endsWith('@moe-dl.edu.my') && email !== 'admin@moe-dl.edu.my') {
+                showError('Sila gunakan emel DELIMa yang sah (@moe-dl.edu.my).');
+                return;
+            }
+
+            if (!supabaseEnabled || !supabase) {
+                showError('Supabase belum disambungkan. Sila lengkapkan SUPABASE_ANON_KEY dahulu.');
+                return;
+            }
+
+            try {
+                const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+                if (error) throw error;
+
+                const authUser = data.user;
+                const meta = authUser.user_metadata || {};
+                const roleFromMeta = meta.role || '';
+                const selectedRole = type === 'admin' ? 'Admin' : (type === 'guru_kelas' ? 'Guru Kelas' : 'Guru');
+
+                if (type === 'admin' && roleFromMeta !== 'admin' && email !== 'admin@moe-dl.edu.my') {
+                    await supabase.auth.signOut();
+                    showError('Akaun ini bukan akaun Admin.');
+                    return;
+                }
+
+                currentUser = {
+                    email,
+                    name: meta.name || email.split('@')[0].toUpperCase(),
+                    fullName: meta.full_name || meta.name || email,
+                    role: selectedRole
+                };
+
+                isAdmin = type === 'admin';
+                await fetchAllDataFromSupabase();
+                showApp();
+                showToast(`Log masuk berjaya sebagai ${currentUser.role}: ${currentUser.name}!`, 'success');
+            } catch (err) {
+                console.error('Login Supabase gagal:', err);
+                showError('Log masuk gagal. Semak emel, kata laluan dan akaun Supabase Auth.');
+            }
+        }
+
+        function showError(msg) {
+            const errorDiv = document.getElementById('login-error');
+            errorDiv.innerText = msg;
+            errorDiv.classList.remove('hidden');
+        }
+        async function handleLogout() {
+            if (supabaseEnabled && supabase) {
+                await supabase.auth.signOut();
+            }
+            currentUser = null;
+            document.getElementById('login-page').classList.remove('hidden');
+            document.getElementById('app-container').classList.add('hidden');
+            document.getElementById('email').value = '';
+            document.getElementById('password').value = '';
+            showToast('Anda telah log keluar sistem.', 'info');
+        }
+
+        function showApp() {
+            document.getElementById('login-page').classList.add('hidden');
+            document.getElementById('app-container').classList.remove('hidden');
+            
+            document.getElementById('user-name-display').innerText = currentUser.name;
+            document.getElementById('user-role-display').innerText = currentUser.role;
+            const avatar = document.getElementById('user-avatar');
+            avatar.innerText = currentUser.name.charAt(0);
+            
+            let avatarBg = 'bg-emerald-500';
+            if (isAdmin) avatarBg = 'bg-slate-800';
+            else if (currentUser.role === 'Guru Kelas') avatarBg = 'bg-teal-600';
+            avatar.className = `w-10 h-10 rounded-full flex items-center justify-center text-white font-bold shadow-sm ${avatarBg}`;
+
+            if (isAdmin) {
+                document.getElementById('admin-indicator').classList.remove('hidden');
+            } else {
+                document.getElementById('admin-indicator').classList.add('hidden');
+            }
+
+            renderMenu();
+            if (currentUser.role === 'Guru Kelas') {
+                navigate('guru_kelas_dashboard');
+            } else {
+                navigate('dashboard');
+            }
+        }
+
+        function renderMenu() {
+            const menu = document.getElementById('nav-menu');
+            let html = `<button onclick="navigate('dashboard')" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all" data-page="dashboard">
+                <i data-lucide="layout-dashboard"></i><span>Dashboard</span>
+            </button>`;
+
+            if (isAdmin) {
+                html += `
+                <button onclick="navigate('data_murid')" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all" data-page="data_murid">
+                    <i data-lucide="users"></i><span>Data Murid</span>
+                </button>
+                <button onclick="navigate('pengisian_markah')" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all" data-page="pengisian_markah">
+                    <i data-lucide="book-open"></i><span>Pengisian Markah</span>
+                </button>
+                <button onclick="navigate('analisis')" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all" data-page="analisis">
+                    <i data-lucide="bar-chart-3"></i><span>Analisis</span>
+                </button>`;
+            } else if (currentUser.role === 'Guru Kelas') {
+                html += `
+                <button onclick="navigate('guru_kelas_dashboard')" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all" data-page="guru_kelas_dashboard">
+                    <i data-lucide="presentation"></i><span>Guru Kelas</span>
+                </button>
+                <button onclick="navigate('analisis')" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all" data-page="analisis">
+                    <i data-lucide="bar-chart-3"></i><span>Analisis</span>
+                </button>`;
+            } else {
+                html += `
+                <button onclick="navigate('pengisian_markah')" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all" data-page="pengisian_markah">
+                    <i data-lucide="book-open"></i><span>Pengisian Markah</span>
+                </button>`;
+            }
+
+            html += `
+            <button onclick="navigate('settings')" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all" data-page="settings">
+                <i data-lucide="settings"></i><span>Tetapan</span>
+            </button>`;
+
+            menu.innerHTML = html;
+            lucide.createIcons();
+        }
+
+        function navigate(pageId) {
+            currentPage = pageId;
+            document.getElementById('page-title').innerText = pageId.replace(/_/g, ' ');
+            
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.getElementById('sidebar-overlay');
+            sidebar.classList.add('closed');
+            overlay.classList.add('hidden');
+
+            document.querySelectorAll('.nav-btn').forEach(btn => {
+                if (btn.getAttribute('data-page') === pageId) {
+                    btn.classList.add('bg-emerald-50', 'text-emerald-700', 'font-bold');
+                    btn.classList.remove('text-gray-500');
+                } else {
+                    btn.classList.remove('bg-emerald-50', 'text-emerald-700', 'font-bold');
+                    btn.classList.add('text-gray-500');
+                }
+            });
+
+            renderPage();
+        }
+
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.getElementById('sidebar-overlay');
+            if (sidebar.classList.contains('closed')) {
+                sidebar.classList.remove('closed');
+                overlay.classList.remove('hidden');
+            } else {
+                sidebar.classList.add('closed');
+                overlay.classList.add('hidden');
+            }
+        }
+
+        // --- TOAST SYSTEMS ---
+        function showToast(message, type = 'success') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            
+            const bgClasses = {
+                success: 'bg-emerald-600 border-emerald-500 text-white',
+                danger: 'bg-rose-600 border-rose-500 text-white',
+                info: 'bg-slate-800 border-slate-700 text-white',
+                warning: 'bg-amber-500 border-amber-400 text-slate-900'
+            };
+
+            const iconMap = {
+                success: 'check-circle-2',
+                danger: 'alert-triangle',
+                info: 'info',
+                warning: 'alert-circle'
+            };
+
+            toast.className = `flex items-center gap-3 px-5 py-3 rounded-2xl shadow-lg border text-sm font-semibold transition-all duration-300 transform translate-y-2 opacity-0 pointer-events-auto ${bgClasses[type]}`;
+            toast.innerHTML = `
+                <i data-lucide="${iconMap[type]}" class="w-5 h-5 shrink-0"></i>
+                <span>${message}</span>
+            `;
+
+            container.appendChild(toast);
+            lucide.createIcons();
+
+            setTimeout(() => {
+                toast.classList.remove('translate-y-2', 'opacity-0');
+            }, 50);
+
+            setTimeout(() => {
+                toast.classList.add('translate-y-2', 'opacity-0');
+                setTimeout(() => { toast.remove(); }, 300);
+            }, 3500);
+        }
+
+        // --- GRADES MATH ---
+        function calculateUASAGrade(score) {
+            if (score === null || score === undefined || score === '') {
+                return { grade: '-', color: 'text-gray-400 bg-gray-50 border-gray-100', label: 'Belum Dinilai' };
+            }
+            const num = parseFloat(score);
+            if (num >= 82 && num <= 100) return { grade: 'A', color: 'text-emerald-700 bg-emerald-50 border-emerald-200', label: 'CEMERLANG' };
+            if (num >= 66 && num <= 81) return { grade: 'B', color: 'text-cyan-700 bg-cyan-50 border-cyan-200', label: 'KEPUJIAN' };
+            if (num >= 50 && num <= 65) return { grade: 'C', color: 'text-amber-700 bg-amber-50 border-amber-200', label: 'MEMUASKAN' };
+            if (num >= 35 && num <= 49) return { grade: 'D', color: 'text-orange-700 bg-orange-50 border-orange-200', label: 'MENCAPAI TAHAP MINIMUM' };
+            if (num >= 1 && num <= 34) return { grade: 'E', color: 'text-rose-700 bg-rose-50 border-rose-200', label: 'BELUM MENCAPAI TAHAP MINIMUM' };
+            if (num === 0) return { grade: 'F', color: 'text-red-700 bg-red-100 border-red-300', label: 'TIDAK MENGUASAI' };
+            return { grade: '-', color: 'text-gray-400 bg-gray-50 border-gray-100', label: 'Belum Dinilai' };
+        }
+
+        // --- DROPDOWN FILTERS ---
+        function handleFilterChange() {
+            selectedYear = document.getElementById('sel-year').value;
+            const newClass = document.getElementById('sel-class').value;
+            const newClassYear = parseInt(newClass.charAt(0)) || 1;
+            selectedClass = newClass;
+            
+            if (newClassYear < 4 && (selectedSubject === 'REKA BENTUK TEKNOLOGI' || selectedSubject === 'SEJARAH')) {
+                selectedSubject = 'BAHASA MELAYU';
+            }
+            
+            selectedAssessment = document.getElementById('sel-test').value;
+            const subElem = document.getElementById('sel-subject');
+            if (subElem) {
+                selectedSubject = subElem.value || 'BAHASA ARAB';
+            }
+            selectedTeacher = document.getElementById('sel-teacher').value;
+            renderPage();
+        }
+
+        // --- SUBMIT AND PERSIST ASSESSMENT ---
+        async function saveMarks(silent = false) {
+            const rows = document.querySelectorAll('.student-row');
+            let successCount = 0;
+            const markRows = [];
+            const pbdRows = [];
+
+            for (const row of rows) {
+                const sId = row.getAttribute('data-id');
+                const markInput = row.querySelector('.mark-input');
+                const pbdSelect = row.querySelector('.pbd-select');
+                const key = `${sId}_${selectedYear}_${selectedAssessment}_${selectedSubject}`;
+                const keyInfo = parseKey(key);
+
+                if (markInput) {
+                    const markVal = markInput.value.trim();
+
+                    if (markVal === '') {
+                        delete studentMarks[key];
+                    } else {
+                        const num = parseFloat(markVal);
+                        if (!isNaN(num) && num >= 0 && num <= 100) {
+                            studentMarks[key] = num;
+                            markRows.push({
+                                key,
+                                student_id: String(keyInfo.student_id),
+                                tahun: keyInfo.tahun,
+                                assessment: keyInfo.assessment,
+                                subject: keyInfo.subject,
+                                value: num,
+                                teacher_email: currentUser ? currentUser.email : null,
+                                updated_at: new Date().toISOString()
+                            });
+                            successCount++;
+                        }
+                    }
+
+                    if (pbdSelect) {
+                        const pbdVal = pbdSelect.value;
+                        if (pbdVal) {
+                            studentPBD[key] = pbdVal;
+                            pbdRows.push({
+                                key,
+                                student_id: String(keyInfo.student_id),
+                                tahun: keyInfo.tahun,
+                                assessment: keyInfo.assessment,
+                                subject: keyInfo.subject,
+                                value: pbdVal,
+                                teacher_email: currentUser ? currentUser.email : null,
+                                updated_at: new Date().toISOString()
+                            });
+                        } else {
+                            delete studentPBD[key];
+                        }
+                    }
+                }
+            }
+
+            await persistMarksBulkToSupabase(markRows, pbdRows);
+
+            if (!silent) {
+                showToast(`Selesai menyimpan ${successCount} rekod prestasi ke Supabase.`, 'success');
+            }
+            renderPage();
+        }
+
+        function toggleEditMode() {
+            isEditMode = !isEditMode;
+            showToast(isEditMode ? 'Mod Penyuntingan Diaktifkan.' : 'Mod Penyuntingan Dikunci.', isEditMode ? 'info' : 'warning');
+            renderPage();
+        }
+
+        async function hantarKeGuruKelas() {
+            await saveMarks(true);
+            showToast(`Kesemua data pentaksiran kelas [${selectedClass}] bagi subjek [${selectedSubject}] telah dihantar secara rasmi ke Dashboard Guru Kelas & Supabase!`, 'success');
+        }
+
+        // --- CSV LOADING AND PROCESSING ---
+        function handleCSVUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const text = e.target.result;
+                const rows = text.split('\n');
+                tempUploadedStudents = [];
+
+                for (let i = 1; i < rows.length; i++) {
+                    const columns = rows[i].split(',');
+                    if (columns.length >= 3) {
+                        const nama = columns[0].trim().toUpperCase();
+                        const ic = columns[1].trim();
+                        const kelas = columns[2].trim().toUpperCase();
+
+                        if (nama && ic && kelas) {
+                            tempUploadedStudents.push({ nama, ic, kelas });
+                        }
+                    }
+                }
+
+                const infoBox = document.getElementById('csv-preview-info');
+                if (infoBox) {
+                    infoBox.innerText = `Menjumpai ${tempUploadedStudents.length} murid sedia untuk diimport.`;
+                    infoBox.classList.remove('hidden');
+                }
+                showToast(`Selesai memuat fail. Sila klik SIMPAN untuk memasukkannya ke sistem.`, 'info');
+            };
+            reader.readAsText(file);
+        }
+
+        async function saveCSVData() {
+            if (tempUploadedStudents.length === 0) {
+                showToast('Tiada data fail CSV dikesan. Sila pilih fail terlebih dahulu.', 'warning');
+                return;
+            }
+
+            let importCount = 0;
+            const startId = students.length > 0 ? Math.max(...students.map(s => s.id)) + 1 : 1;
+
+            for (let i = 0; i < tempUploadedStudents.length; i++) {
+                const row = tempUploadedStudents[i];
+                const exists = students.some(s => s.ic === row.ic);
+                
+                if (!exists) {
+                    const studentObj = {
+                        id: startId + importCount,
+                        nama: row.nama,
+                        ic: row.ic,
+                        kelas: row.kelas
+                    };
+                    students.push(studentObj);
+                    importCount++;
+                }
+            }
+
+            const newStudentsForUpload = students.slice(students.length - importCount);
+            await persistStudentsBulkToSupabase(newStudentsForUpload);
+
+            tempUploadedStudents = [];
+            const infoBox = document.getElementById('csv-preview-info');
+            if (infoBox) {
+                infoBox.classList.add('hidden');
+            }
+            const csvInput = document.getElementById('csv-file-input');
+            if (csvInput) csvInput.value = '';
+
+            showToast(`Berjaya mendaftar ${importCount} murid baharu ke sistem & Supabase!`, 'success');
+            renderPage();
+        }
+
+        // --- MANUAL REGISTRATION ---
+        function handleManualRegisterSubmit(event) {
+            event.preventDefault();
+            const namaInput = document.getElementById('admin-reg-nama');
+            const icInput = document.getElementById('admin-reg-ic');
+            const kelasSelect = document.getElementById('admin-reg-kelas');
+
+            const nama = namaInput.value.trim().toUpperCase();
+            const ic = icInput.value.trim();
+            const kelas = kelasSelect.value;
+
+            if (!nama || !ic || !kelas) {
+                showToast('Sila isikan semua butiran pendaftaran murid.', 'warning');
+                return;
+            }
+
+            const exists = students.some(s => s.ic === ic);
+            if (exists) {
+                showToast('No. Kad Pengenalan ini telah berdaftar di dalam sistem.', 'danger');
+                return;
+            }
+
+            pendingRegistrationData = { nama, ic, kelas };
+            document.getElementById('confirm-modal').classList.remove('hidden');
+        }
+
+        async function closeConfirmModal(isConfirmed) {
+            document.getElementById('confirm-modal').classList.add('hidden');
+            
+            if (isConfirmed && pendingRegistrationData) {
+                const { nama, ic, kelas } = pendingRegistrationData;
+                const newId = students.length > 0 ? Math.max(...students.map(s => s.id)) + 1 : 1;
+                const newStudent = { id: newId, nama, ic, kelas };
+                
+                students.push(newStudent);
+                await persistStudentToSupabase(newStudent);
+
+                showToast('Nama murid berjaya disimpan ke sistem & Supabase.', 'success');
+
+                document.getElementById('admin-reg-nama').value = '';
+                document.getElementById('admin-reg-ic').value = '';
+                pendingRegistrationData = null;
+                renderPage();
+            }
+        }
+
+        async function deleteStudent(id) {
+            const index = students.findIndex(s => s.id == id);
+            if (index !== -1) {
+                const targetName = students[index].nama;
+                students.splice(index, 1);
+                await deleteStudentFromSupabase(id);
+                showToast(`Murid ${targetName} berjaya dipadamkan.`, 'info');
+                renderPage();
+            }
+        }
+
+        // --- RENDER DYNAMIC PAGES ---
+        function renderPage() {
+            const content = document.getElementById('page-content');
+            
+            if (currentPage === 'dashboard') {
+                const totalStudents = students.length;
+                const totalClasses = classes.length;
+                const totalSubjects = baseSubjects.length;
+
+                content.innerHTML = `
+                    <div class="space-y-6">
+                        <div class="bg-gradient-to-r from-emerald-600 to-teal-600 text-white p-6 md:p-8 rounded-3xl shadow-md border border-emerald-500/10 relative overflow-hidden">
+                            <div class="relative z-10 space-y-2">
+                                <h3 class="text-xl md:text-2xl font-extrabold tracking-tight">Selamat Datang Ke Portal Pentaksiran SK Bukit Tongkat</h3>
+                                <p class="text-xs md:text-sm text-emerald-100 font-medium">Sistem Pengurusan Murid, Analisis Akademik Pentaksiran UASA & Penilaian Bilik Darjah (PBD).</p>
+                            </div>
+                            <i data-lucide="sparkles" class="absolute right-6 bottom-4 w-28 h-28 opacity-10 rotate-12"></i>
+                        </div>
+
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                            <div class="bg-white p-6 rounded-2xl border border-emerald-100 shadow-sm flex items-center gap-4">
+                                <div class="bg-emerald-50 text-emerald-600 p-3.5 rounded-xl"><i data-lucide="users" class="w-6 h-6"></i></div>
+                                <div>
+                                    <p class="text-[11px] font-bold text-gray-400 uppercase">Jumlah Murid Terdaftar</p>
+                                    <h4 class="text-2xl font-bold text-gray-800">${totalStudents} Orang</h4>
+                                </div>
+                            </div>
+                            <div class="bg-white p-6 rounded-2xl border border-emerald-100 shadow-sm flex items-center gap-4">
+                                <div class="bg-teal-50 text-teal-600 p-3.5 rounded-xl"><i data-lucide="school" class="w-6 h-6"></i></div>
+                                <div>
+                                    <p class="text-[11px] font-bold text-gray-400 uppercase">Jumlah Bilik Kelas</p>
+                                    <h4 class="text-2xl font-bold text-gray-800">${totalClasses} Kelas</h4>
+                                </div>
+                            </div>
+                            <div class="bg-white p-6 rounded-2xl border border-emerald-100 shadow-sm flex items-center gap-4">
+                                <div class="bg-cyan-50 text-cyan-600 p-3.5 rounded-xl"><i data-lucide="book-open-check" class="w-6 h-6"></i></div>
+                                <div>
+                                    <p class="text-[11px] font-bold text-gray-400 uppercase">Subjek Teras Dipantau</p>
+                                    <h4 class="text-2xl font-bold text-gray-800">${totalSubjects} Matapelajaran</h4>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                            <div class="bg-white p-6 rounded-2xl border border-emerald-100 shadow-sm space-y-4">
+                                <h3 class="font-bold text-gray-800 text-base flex items-center gap-2"><i data-lucide="activity" class="w-5 h-5 text-emerald-600"></i> Aktiviti Pintas</h3>
+                                <div class="grid grid-cols-2 gap-3">
+                                    <button onclick="navigate('pengisian_markah')" class="p-4 border border-emerald-50/60 rounded-xl bg-emerald-50/20 hover:bg-emerald-50 hover:border-emerald-200 text-left transition-all group">
+                                        <i data-lucide="edit-3" class="w-5 h-5 text-emerald-600 mb-2"></i>
+                                        <p class="text-xs font-bold text-gray-800">Isi Markah</p>
+                                        <p class="text-[10px] text-gray-400 font-medium">Buka gred pentaksiran</p>
+                                    </button>
+                                    <button onclick="navigate('analisis')" class="p-4 border border-teal-50/60 rounded-xl bg-teal-50/20 hover:bg-teal-50 hover:border-teal-200 text-left transition-all group">
+                                        <i data-lucide="trending-up" class="w-5 h-5 text-teal-600 mb-2"></i>
+                                        <p class="text-xs font-bold text-gray-800">Analisis Prestasi</p>
+                                        <p class="text-[10px] text-gray-400 font-medium">Statistik UASA & PBD</p>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="bg-white p-6 rounded-2xl border border-emerald-100 shadow-sm flex flex-col justify-between">
+                                <div>
+                                    <h3 class="font-bold text-gray-800 text-base flex items-center gap-2 mb-2"><i data-lucide="info" class="w-5 h-5 text-slate-700"></i> Status Pangkalan Data</h3>
+                                    <p class="text-xs text-gray-500 font-medium leading-relaxed">Sistem disepadukan bersama Supabase. Semua transaksi pendaftaran dan pengisian dikemaskini secara masa nyata.</p>
+                                </div>
+                                <div class="mt-4 pt-3 border-t border-slate-50 flex items-center justify-between">
+                                    <span class="flex items-center gap-1.5 text-xs text-emerald-600 font-semibold">
+                                        <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping"></span>
+                                        ${supabaseEnabled ? 'Supabase Berhubung' : 'Mod Simpanan Tempatan'}
+                                    </span>
+                                    <span class="text-[10px] text-gray-400 font-bold uppercase">Versi 1.6.0</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            else if (currentPage === 'data_murid' && isAdmin) {
+                const searchVal = searchQuery.toUpperCase();
+                const filtered = students.filter(s => s.nama.includes(searchVal) || s.ic.includes(searchVal) || s.kelas.includes(searchVal));
+
+                content.innerHTML = `
+                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        <div class="lg:col-span-2 bg-white rounded-2xl border border-emerald-100 shadow-sm overflow-hidden flex flex-col h-[70vh]">
+                            <div class="p-4 border-b border-emerald-100 flex flex-col sm:flex-row gap-3 items-center justify-between">
+                                <div class="relative w-full sm:max-w-xs">
+                                    <input type="text" id="search-students" value="${searchQuery}" oninput="searchQuery = this.value; renderPage()" placeholder="Cari Nama/Mykad/Kelas..." class="w-full pl-9 pr-4 py-2 border border-gray-200 rounded-xl text-xs outline-none focus:ring-2 focus:ring-emerald-500">
+                                    <i data-lucide="search" class="absolute left-3 top-2.5 w-4 h-4 text-gray-400"></i>
+                                </div>
+                                <span class="text-xs font-bold text-slate-400 shrink-0">Menunjukkan ${filtered.length} rekod</span>
+                            </div>
+
+                            <div class="overflow-y-auto flex-grow">
+                                <table class="w-full text-left border-collapse">
+                                    <thead>
+                                        <tr class="bg-slate-50 text-[10px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100">
+                                            <th class="p-4">Nama Murid</th>
+                                            <th class="p-4">No. MyKad</th>
+                                            <th class="p-4">Kelas</th>
+                                            <th class="p-4 text-right">Tindakan</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-slate-100 text-xs">
+                                        ${filtered.map(s => `
+                                            <tr class="hover:bg-slate-50/50">
+                                                <td class="p-4 font-bold text-gray-800">${s.nama}</td>
+                                                <td class="p-4 text-gray-500 font-semibold">${s.ic}</td>
+                                                <td class="p-4"><span class="bg-emerald-50 text-emerald-700 text-[10px] px-2.5 py-1 rounded-full font-bold">${s.kelas}</span></td>
+                                                <td class="p-4 text-right">
+                                                    <button onclick="deleteStudent(${s.id})" class="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-all" title="Padam Rekod">
+                                                        <i data-lucide="trash-2" class="w-4 h-4"></i>
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        `).join('')}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <div class="space-y-6">
+                            <!-- Pendaftaran Manual -->
+                            <div class="bg-white p-6 rounded-2xl border border-emerald-100 shadow-sm space-y-4">
+                                <h3 class="font-bold text-gray-800 text-base flex items-center gap-2"><i data-lucide="user-plus" class="w-5 h-5 text-emerald-600"></i> Daftar Manual</h3>
+                                <form id="manual-reg-form" onsubmit="handleManualRegisterSubmit(event)" class="space-y-3">
+                                    <div class="space-y-1">
+                                        <label class="text-[11px] font-bold text-gray-400 uppercase">Nama Murid</label>
+                                        <input id="admin-reg-nama" type="text" required class="w-full p-2.5 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500 text-xs font-semibold" placeholder="CONTOH: ALI BIN ABU">
+                                    </div>
+                                    <div class="space-y-1">
+                                        <label class="text-[11px] font-bold text-gray-400 uppercase">MyKad (IC)</label>
+                                        <input id="admin-reg-ic" type="text" required class="w-full p-2.5 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500 text-xs font-semibold" placeholder="YYMMDD-SS-NNNN">
+                                    </div>
+                                    <div class="space-y-1">
+                                        <label class="text-[11px] font-bold text-gray-400 uppercase">Kelas Pentaksiran</label>
+                                        <select id="admin-reg-kelas" class="w-full p-2.5 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500 text-xs font-semibold">
+                                            ${classes.map(c => `<option value="${c}">${c}</option>`).join('')}
+                                        </select>
+                                    </div>
+                                    <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 rounded-xl transition-all shadow-sm text-xs">
+                                        Simpan Pendaftaran
+                                    </button>
+                                </form>
+                            </div>
+
+                            <!-- Muat Naik CSV -->
+                            <div class="bg-white p-6 rounded-2xl border border-emerald-100 shadow-sm space-y-4">
+                                <h3 class="font-bold text-gray-800 text-base flex items-center gap-2"><i data-lucide="file-up" class="w-5 h-5 text-teal-600"></i> Muat Naik Fail CSV</h3>
+                                <div class="space-y-3">
+                                    <div class="border-2 border-dashed border-gray-200 hover:border-emerald-400 p-4 rounded-xl text-center transition-all relative">
+                                        <input type="file" id="csv-file-input" accept=".csv" onchange="handleCSVUpload(event)" class="absolute inset-0 opacity-0 cursor-pointer">
+                                        <i data-lucide="upload-cloud" class="w-8 h-8 text-gray-400 mx-auto mb-2"></i>
+                                        <p class="text-xs font-semibold text-gray-500">Klik atau heret fail CSV di sini</p>
+                                        <p class="text-[10px] text-gray-400 font-medium">Format: Nama, IC, Kelas</p>
+                                    </div>
+                                    <div id="csv-preview-info" class="hidden bg-emerald-50 border border-emerald-100 text-emerald-800 text-[11px] p-2.5 rounded-xl font-bold"></div>
+                                    
+                                    <button type="button" onclick="saveCSVData()" class="w-full bg-teal-600 hover:bg-teal-700 text-white font-bold py-2.5 rounded-xl transition-all shadow-sm text-xs flex items-center justify-center gap-1.5">
+                                        <i data-lucide="save" class="w-4 h-4"></i> Simpan Data CSV ke Supabase
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            else if (currentPage === 'pengisian_markah') {
+                const classYearNum = parseInt(selectedClass.charAt(0)) || 1;
+                const subjectsToUse = baseSubjects;
+                const activeStudents = students.filter(s => s.kelas === selectedClass);
+
+                content.innerHTML = `
+                    <div class="space-y-6">
+                        <!-- Filters -->
+                        <div class="bg-white p-6 rounded-2xl border border-emerald-100 shadow-sm grid grid-cols-2 md:grid-cols-5 gap-3">
+                            <div class="space-y-1">
+                                <label class="text-[10px] font-bold text-gray-400 uppercase">Sesi Akademik</label>
+                                <select id="sel-year" onchange="handleFilterChange()" class="w-full p-2 border border-gray-100 rounded-lg text-xs font-semibold outline-none focus:ring-1 focus:ring-emerald-500">
+                                    ${years.map(y => `<option value="${y}" ${selectedYear===y?'selected':''}>Sesi ${y}</option>`).join('')}
+                                </select>
+                            </div>
+                            <div class="space-y-1">
+                                <label class="text-[10px] font-bold text-gray-400 uppercase">Bilik Darjah</label>
+                                <select id="sel-class" onchange="handleFilterChange()" class="w-full p-2 border border-gray-100 rounded-lg text-xs font-semibold outline-none focus:ring-1 focus:ring-emerald-500">
+                                    ${classes.map(c => `<option value="${c}" ${selectedClass===c?'selected':''}>Kelas ${c}</option>`).join('')}
+                                </select>
+                            </div>
+                            <div class="space-y-1 col-span-2 md:col-span-1">
+                                <label class="text-[10px] font-bold text-gray-400 uppercase">Jenis Pentaksiran</label>
+                                <select id="sel-test" onchange="handleFilterChange()" class="w-full p-2 border border-gray-100 rounded-lg text-xs font-semibold outline-none focus:ring-1 focus:ring-emerald-500">
+                                    ${assessments.map(a => `<option value="${a}" ${selectedAssessment===a?'selected':''}>${a}</option>`).join('')}
+                                </select>
+                            </div>
+                            <div class="space-y-1">
+                                <label class="text-[10px] font-bold text-gray-400 uppercase">Matapelajaran</label>
+                                <select id="sel-subject" onchange="handleFilterChange()" class="w-full p-2 border border-gray-100 rounded-lg text-xs font-semibold outline-none focus:ring-1 focus:ring-emerald-500">
+                                    ${subjectsToUse.map(s => `<option value="${s}" ${selectedSubject===s?'selected':''}>${s}</option>`).join('')}
+                                </select>
+                            </div>
+                            <div class="space-y-1 col-span-2 md:col-span-1">
+                                <label class="text-[10px] font-bold text-gray-400 uppercase">Nama Guru Pentaksir</label>
+                                <select id="sel-teacher" onchange="handleFilterChange()" class="w-full p-2 border border-gray-100 rounded-lg text-xs font-semibold outline-none focus:ring-1 focus:ring-emerald-500">
+                                    ${teachers.map(t => `<option value="${t}" ${selectedTeacher===t?'selected':''}>${t}</option>`).join('')}
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Data Table Card -->
+                        <div class="bg-white rounded-2xl border border-emerald-100 shadow-sm overflow-hidden">
+                            <div class="p-4 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
+                                <h3 class="font-bold text-gray-800 text-xs flex items-center gap-1.5 uppercase">
+                                    <span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
+                                    Prestasi Murid: ${selectedClass} (${activeStudents.length} Murid)
+                                </h3>
+                                <div class="flex items-center gap-2">
+                                    <button onclick="toggleEditMode()" class="px-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-700 hover:bg-slate-50 transition-all flex items-center gap-1">
+                                        <i data-lucide="${isEditMode ? 'lock' : 'unlock'}" class="w-3.5 h-3.5"></i> ${isEditMode ? 'Kunci Mod' : 'Kemaskini'}
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div class="overflow-x-auto">
+                                <table class="w-full text-left border-collapse min-w-[700px]">
+                                    <thead>
+                                        <tr class="bg-slate-50 border-b border-slate-100 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                                            <th class="p-4 sticky-col">Nama Penuh Murid</th>
+                                            <th class="p-4">No. MyKad</th>
+                                            <th class="p-4 w-32">Markah UASA (0-100)</th>
+                                            <th class="p-4 w-32">Gred UASA</th>
+                                            <th class="p-4 w-40">PBD (Pendidikan Bilik Darjah)</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-slate-50 text-xs">
+                                        ${activeStudents.map(s => {
+                                            const key = `${s.id}_${selectedYear}_${selectedAssessment}_${selectedSubject}`;
+                                            const mark = studentMarks[key] !== undefined ? studentMarks[key] : '';
+                                            const pbd = studentPBD[key] || '';
+                                            const gradeResult = calculateUASAGrade(mark);
+
+                                            return `
+                                                <tr class="student-row hover:bg-slate-50/20" data-id="${s.id}">
+                                                    <td class="p-4 font-bold text-gray-800 sticky-col">${s.nama}</td>
+                                                    <td class="p-4 text-slate-500 font-semibold">${s.ic}</td>
+                                                    <td class="p-4">
+                                                        <input type="number" min="0" max="100" value="${mark}" ${!isEditMode?'disabled':''} class="mark-input w-20 p-2 border border-slate-100 focus:border-emerald-300 outline-none rounded-lg font-bold text-center bg-slate-50/50 focus:bg-white text-xs" onchange="updateRowGrade(this)">
+                                                    </td>
+                                                    <td class="p-4">
+                                                        <span class="grade-label inline-block px-3 py-1 rounded-full font-bold text-[10px] border ${gradeResult.color}">
+                                                            ${gradeResult.grade} (${gradeResult.label})
+                                                        </span>
+                                                    </td>
+                                                    <td class="p-4">
+                                                        <select ${!isEditMode?'disabled':''} class="pbd-select w-full p-2 border border-slate-100 rounded-lg outline-none text-xs font-bold text-slate-700 bg-slate-50/30">
+                                                            <option value="">- PILIH TP -</option>
+                                                            <option value="TP1" ${pbd==='TP1'?'selected':''}>TP1</option>
+                                                            <option value="TP2" ${pbd==='TP2'?'selected':''}>TP2</option>
+                                                            <option value="TP3" ${pbd==='TP3'?'selected':''}>TP3</option>
+                                                            <option value="TP4" ${pbd==='TP4'?'selected':''}>TP4</option>
+                                                            <option value="TP5" ${pbd==='TP5'?'selected':''}>TP5</option>
+                                                            <option value="TP6" ${pbd==='TP6'?'selected':''}>TP6</option>
+                                                        </select>
+                                                    </td>
+                                                </tr>
+                                            `;
+                                        }).join('')}
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <div class="p-5 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-3">
+                                <button onclick="saveMarks()" class="w-full sm:w-auto px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 shadow-sm transition-all">
+                                    <i data-lucide="save" class="w-4 h-4"></i> SIMPAN
+                                </button>
+                                <button onclick="hantarKeGuruKelas()" class="w-full sm:w-auto px-5 py-2.5 bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 transition-all">
+                                    <i data-lucide="send" class="w-4 h-4"></i> HANTAR SAHAJA
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            else if (currentPage === 'analisis') {
+                content.innerHTML = `
+                    <div class="space-y-6">
+                        <!-- Navigation tabs -->
+                        <div class="flex flex-wrap items-center gap-2 border-b border-slate-200 no-print">
+                            <button onclick="changeAnalysisMode('overall_pbd_report')" class="px-4 py-2 text-xs font-bold transition-all border-b-2 ${analysisSelectedMode==='overall_pbd_report'?'border-emerald-600 text-emerald-700':'border-transparent text-gray-400 hover:text-slate-600'}">
+                                📊 Laporan Keseluruhan Kelas (etert.jpg)
+                            </button>
+                            <button onclick="changeAnalysisMode('pbd_excel_dashboard')" class="px-4 py-2 text-xs font-bold transition-all border-b-2 ${analysisSelectedMode==='pbd_excel_dashboard'?'border-emerald-600 text-emerald-700':'border-transparent text-gray-400 hover:text-slate-600'}">
+                                📈 Format Excel Mengikut Kelas & Subjek
+                            </button>
+                            <button onclick="changeAnalysisMode('individu')" class="px-4 py-2 text-xs font-bold transition-all border-b-2 ${analysisSelectedMode==='individu'?'border-emerald-600 text-emerald-700':'border-transparent text-gray-400 hover:text-slate-600'}">
+                                Roster Murid Individu
+                            </button>
+                            <button onclick="changeAnalysisMode('pbd_ringkasan')" class="px-4 py-2 text-xs font-bold transition-all border-b-2 ${analysisSelectedMode==='pbd_ringkasan'?'border-emerald-600 text-emerald-700':'border-transparent text-gray-400 hover:text-slate-600'}">
+                                Ringkasan TP PBD
+                            </button>
+                        </div>
+
+                        ${analysisSelectedMode === 'overall_pbd_report' ? renderOverallPBDReport() : 
+                          analysisSelectedMode === 'pbd_excel_dashboard' ? renderExcelReportMode() : 
+                          analysisSelectedMode === 'pbd_ringkasan' ? renderAnalysisPBD() : renderAnalysisIndividu()}
+                    </div>
+                `;
+            }
+
+            else if (currentPage === 'settings') {
+                content.innerHTML = `
+                    <div class="max-w-xl mx-auto bg-white p-6 md:p-8 rounded-3xl border border-emerald-100 shadow-sm space-y-6">
+                        <div class="space-y-2">
+                            <h3 class="text-lg font-bold text-gray-800">Sistem Tetapan & Utiliti</h3>
+                            <p class="text-xs text-gray-500 leading-relaxed font-medium">Urus pangkalan data, bersihkan cache lokal, atau set semula data standard pentaksiran SK Bukit Tongkat.</p>
+                        </div>
+
+                        <div class="space-y-4 pt-4 border-t border-slate-50">
+                            <div class="flex items-center justify-between p-4 border border-slate-100 bg-slate-50/50 rounded-2xl">
+                                <div>
+                                    <p class="text-xs font-bold text-gray-800">Segar Semula Data Supabase</p>
+                                    <p class="text-[10px] text-gray-400 font-medium">Segerakan data murid & markah dari awan.</p>
+                                </div>
+                                <button onclick="fetchAllDataFromSupabase().then(()=>showToast('Selesai penyegerakan!', 'success'))" class="px-3 py-2 bg-emerald-600 text-white rounded-xl text-xs font-bold hover:bg-emerald-700 transition-all flex items-center gap-1">
+                                    <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i> Segerakan
+                                </button>
+                            </div>
+
+                            <div class="flex items-center justify-between p-4 border border-rose-50 bg-rose-50/10 rounded-2xl">
+                                <div>
+                                    <p class="text-xs font-bold text-rose-800">Reset Set data</p>
+                                    <p class="text-[10px] text-rose-400 font-medium">Kembalikan data standard sistem (Tempatan sahaja).</p>
+                                </div>
+                                <button onclick="localStorage.clear(); location.reload();" class="px-3 py-2 bg-rose-600 text-white rounded-xl text-xs font-bold hover:bg-rose-700 transition-all">
+                                    Set Semula
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            else if (currentPage === 'guru_kelas_dashboard') {
+                const assignedClass = '1 AR-RAZI';
+                const classStudents = students.filter(s => s.kelas === assignedClass);
+
+                content.innerHTML = `
+                    <div class="space-y-6">
+                        <div class="bg-gradient-to-r from-teal-600 to-cyan-600 text-white p-6 rounded-3xl shadow-sm border border-teal-500/10 relative overflow-hidden">
+                            <div class="relative z-10 space-y-1">
+                                <h3 class="text-lg md:text-xl font-bold tracking-tight">Kabin Kawalan Guru Kelas: ${assignedClass}</h3>
+                                <p class="text-[11px] md:text-xs text-teal-100 font-medium">Uruskan, jejak, dan semak penyata akhir UASA murid anda.</p>
+                            </div>
+                            <i data-lucide="presentation" class="absolute right-6 bottom-4 w-24 h-24 opacity-10 rotate-6"></i>
+                        </div>
+
+                        <div class="bg-white p-6 rounded-2xl border border-emerald-100 shadow-sm space-y-4">
+                            <h3 class="font-bold text-gray-800 text-sm flex items-center gap-1.5"><i data-lucide="users" class="w-5 h-5 text-teal-600"></i> Senarai Roster Kelas (${classStudents.length} Murid)</h3>
+                            <div class="overflow-y-auto max-h-[400px]">
+                                <table class="w-full text-left border-collapse text-xs">
+                                    <thead>
+                                        <tr class="bg-slate-50 border-b border-slate-100 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                                            <th class="p-3">Nama Murid</th>
+                                            <th class="p-3">No. MyKad</th>
+                                            <th class="p-3 text-right">Perincian</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-slate-50">
+                                        ${classStudents.map(cs => `
+                                            <tr class="hover:bg-slate-50/20">
+                                                <td class="p-3 font-bold text-slate-800">${cs.nama}</td>
+                                                <td class="p-3 text-slate-500 font-medium">${cs.ic}</td>
+                                                <td class="p-3 text-right">
+                                                    <button onclick="viewStudentPerformance(${cs.id})" class="text-teal-600 hover:underline font-bold">Analisis</button>
+                                                </td>
+                                            </tr>
+                                        `).join('')}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            lucide.createIcons();
+        }
+
+        // --- SUB-TABS INTERACTIVE HANDLERS ---
+        function changeAnalysisMode(mode) {
+            analysisSelectedMode = mode;
+            renderPage();
+        }
+
+        function viewStudentPerformance(sId) {
+            analysisSelectedStudentId = sId;
+            analysisSelectedMode = 'individu';
+            navigate('analisis');
+        }
+
+        function updateRowGrade(inputElem) {
+            const row = inputElem.closest('.student-row');
+            const score = inputElem.value.trim();
+            const label = row.querySelector('.grade-label');
+            const calculated = calculateUASAGrade(score);
+            
+            label.className = `grade-label inline-block px-3 py-1 rounded-full font-bold text-[10px] border ${calculated.color}`;
+            label.innerText = `${calculated.grade} (${calculated.label})`;
+        }
+
+        // --- NEW: RENDER OVERALL PBD REPORT (etert.jpg) ---
+        function renderOverallPBDReport() {
+            // Generate list of Years TAHUN 1 to TAHUN 6
+            const yearsList = ['1', '2', '3', '4', '5', '6'];
+            const allStats = {};
+            
+            yearsList.forEach(yr => {
+                allStats[yr] = calculatePBDStatsForYear(yr);
+            });
+
+            // Summary calculations
+            const totalStudents = students.length;
+            const totalClasses = classes.length;
+            const totalSubjects = baseSubjects.length;
+
+            let countTP1_2 = 0;
+            let countTP3_6 = 0;
+            let totalEvaluations = 0;
+
+            Object.values(studentPBD).forEach(v => {
+                if (['TP1', 'TP2'].includes(v)) countTP1_2++;
+                if (['TP3', 'TP4', 'TP5', 'TP6'].includes(v)) countTP3_6++;
+                totalEvaluations++;
+            });
+
+            const pctTP1_2 = totalEvaluations > 0 ? ((countTP1_2 / totalEvaluations) * 100).toFixed(1) : "0.0";
+            const pctTP3_6 = totalEvaluations > 0 ? ((countTP3_6 / totalEvaluations) * 100).toFixed(1) : "100.0";
+
+            return `
+                <div class="space-y-6">
+                    <!-- Dashboard Atas -->
+                    <div class="grid grid-cols-2 md:grid-cols-5 gap-4 no-print font-bold text-xs">
+                        <div class="bg-white p-4 rounded-xl border border-slate-100 shadow-sm">
+                            <p class="text-[10px] font-bold text-slate-400 uppercase">Jumlah Murid</p>
+                            <h4 class="text-lg font-bold text-slate-800">${totalStudents} Orang</h4>
+                        </div>
+                        <div class="bg-white p-4 rounded-xl border border-slate-100 shadow-sm">
+                            <p class="text-[10px] font-bold text-slate-400 uppercase">Jumlah Kelas</p>
+                            <h4 class="text-lg font-bold text-slate-800">${totalClasses} Kelas</h4>
+                        </div>
+                        <div class="bg-white p-4 rounded-xl border border-slate-100 shadow-sm">
+                            <p class="text-[10px] font-bold text-slate-400 uppercase">Jumlah Subjek</p>
+                            <h4 class="text-lg font-bold text-slate-800">${totalSubjects}</h4>
+                        </div>
+                        <div class="bg-white p-4 rounded-xl border border-slate-100 shadow-sm">
+                            <p class="text-[10px] font-bold text-slate-400 uppercase">Peratus TP1-TP2</p>
+                            <h4 class="text-lg font-bold text-rose-600">${pctTP1_2}%</h4>
+                        </div>
+                        <div class="bg-white p-4 rounded-xl border border-slate-100 shadow-sm">
+                            <p class="text-[10px] font-bold text-slate-400 uppercase">Peratus TP3-TP6</p>
+                            <h4 class="text-lg font-bold text-emerald-600">${pctTP3_6}%</h4>
+                        </div>
+                    </div>
+
+                    <!-- Butang Kawalan -->
+                    <div class="bg-white p-4 rounded-xl border border-slate-100 shadow-sm flex flex-col md:flex-row items-center justify-between gap-3 no-print font-bold">
+                        <span class="text-xs text-slate-500">Menjana Laporan Keseluruhan Merentasi Sesi Akademik ${analysisSelectedAcademicYearPBD}</span>
+                        <div class="flex items-center gap-2">
+                            <button onclick="exportOverallExcel()" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg text-xs flex items-center gap-1.5 transition-all shadow-sm">
+                                <i data-lucide="file-spreadsheet" class="w-4 h-4"></i> 📊 Export Excel
+                            </button>
+                            <button onclick="printReport()" class="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white font-bold rounded-lg text-xs flex items-center gap-1.5 transition-all shadow-sm">
+                                <i data-lucide="printer" class="w-4 h-4"></i> 🖨️ Print Laporan
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- AREA LAPORAN KESELURUHAN (etert.jpg STYLE) -->
+                    <div id="print-area" class="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm excel-report-container space-y-6">
+                        
+                        <!-- Tajuk Utama -->
+                        <div class="text-center space-y-1">
+                            <h2 class="text-base font-bold uppercase tracking-wide">ANALISIS PENTAKSIRAN BILIK DARJAH (PBD)</h2>
+                            <h2 class="text-sm font-bold uppercase tracking-wide">SESI AKADEMIK 2026</h2>
+                            <h2 class="text-xs font-bold uppercase tracking-wide text-slate-600">MENGIKUT KELAS (KESELURUHAN TAHUN 1 - 6)</h2>
+                        </div>
+
+                        <!-- Jadual Kompak -->
+                        <div class="overflow-x-auto">
+                            <table id="overall-excel-table" class="excel-table">
+                                <thead>
+                                    <!-- Header Utama -->
+                                    <tr>
+                                        <th rowspan="2" class="w-24">KELAS</th>
+                                        <th rowspan="2" class="w-20">BIL MURID</th>
+                                        <th rowspan="2">MATA PELAJARAN</th>
+                                        <th colspan="2" class="tp1-col">TP 1</th>
+                                        <th colspan="2" class="tp2-col">TP 2</th>
+                                        <th colspan="2" class="tp3-col">TP 3</th>
+                                        <th colspan="2" class="tp4-col">TP 4</th>
+                                        <th colspan="2" class="tp5-col">TP 5</th>
+                                        <th colspan="2" class="tp6-col">TP 6</th>
+                                    </tr>
+                                    <tr>
+                                        <!-- Sub Header Bil / % -->
+                                        <th class="tp1-col">BIL</th><th class="tp1-col">%</th>
+                                        <th class="tp2-col">BIL</th><th class="tp2-col">%</th>
+                                        <th class="tp3-col">BIL</th><th class="tp3-col">%</th>
+                                        <th class="tp4-col">BIL</th><th class="tp4-col">%</th>
+                                        <th class="tp5-col">BIL</th><th class="tp5-col">%</th>
+                                        <th class="tp6-col">BIL</th><th class="tp6-col">%</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${yearsList.map(yr => {
+                                        const yearStudents = students.filter(s => s.kelas.startsWith(yr + ' '));
+                                        const bilMurid = yearStudents.length;
+                                        const stats = allStats[yr];
+
+                                        // Total Bil evaluations for year (subjects * students)
+                                        const totalSubjectsEval = bilMurid * baseSubjects.length;
+
+                                        // Cumulative stats per year for the JUMLAH row
+                                        const yearCumulative = { TP1:0, TP2:0, TP3:0, TP4:0, TP5:0, TP6:0 };
+
+                                        // Build subjects HTML
+                                        const subjectsRows = baseSubjects.map((sub, idx) => {
+                                            const subData = stats[sub]['JUMLAH'];
+                                            const activeTot = subData.Total || 1;
+
+                                            // Accumulate
+                                            yearCumulative.TP1 += subData.TP1;
+                                            yearCumulative.TP2 += subData.TP2;
+                                            yearCumulative.TP3 += subData.TP3;
+                                            yearCumulative.TP4 += subData.TP4;
+                                            yearCumulative.TP5 += subData.TP5;
+                                            yearCumulative.TP6 += subData.TP6;
+
+                                            return `
+                                                <tr>
+                                                    ${idx === 0 ? `<td rowspan="${baseSubjects.length}" class="excel-bg-blue-year font-bold text-center">TAHUN ${yr}</td>` : ''}
+                                                    ${idx === 0 ? `<td rowspan="${baseSubjects.length}" class="excel-bg-blue-year font-bold text-center">${bilMurid}</td>` : ''}
+                                                    <td class="text-left font-bold pl-2">${sub}</td>
+                                                    <td class="tp1-col">${subData.TP1}</td><td class="tp1-col">${((subData.TP1/activeTot)*100).toFixed(2)}</td>
+                                                    <td class="tp2-col">${subData.TP2}</td><td class="tp2-col">${((subData.TP2/activeTot)*100).toFixed(2)}</td>
+                                                    <td class="tp3-col">${subData.TP3}</td><td class="tp3-col">${((subData.TP3/activeTot)*100).toFixed(2)}</td>
+                                                    <td class="tp4-col">${subData.TP4}</td><td class="tp4-col">${((subData.TP4/activeTot)*100).toFixed(2)}</td>
+                                                    <td class="tp5-col">${subData.TP5}</td><td class="tp5-col">${((subData.TP5/activeTot)*100).toFixed(2)}</td>
+                                                    <td class="tp6-col">${subData.TP6}</td><td class="tp6-col">${((subData.TP6/activeTot)*100).toFixed(2)}</td>
+                                                </tr>
+                                            `;
+                                        }).join('');
+
+                                        // Totals calculation
+                                        const sumEval = totalSubjectsEval || 1;
+                                        const totalRow = `
+                                            <tr class="excel-bg-yellow-total">
+                                                <td colspan="2" class="excel-bg-yellow-total">JUMLAH</td>
+                                                <td class="text-center font-bold">${totalSubjectsEval}</td>
+                                                <td>${yearCumulative.TP1}</td><td>${((yearCumulative.TP1/sumEval)*100).toFixed(2)}</td>
+                                                <td>${yearCumulative.TP2}</td><td>${((yearCumulative.TP2/sumEval)*100).toFixed(2)}</td>
+                                                <td>${yearCumulative.TP3}</td><td>${((yearCumulative.TP3/sumEval)*100).toFixed(2)}</td>
+                                                <td>${yearCumulative.TP4}</td><td>${((yearCumulative.TP4/sumEval)*100).toFixed(2)}</td>
+                                                <td>${yearCumulative.TP5}</td><td>${((yearCumulative.TP5/sumEval)*100).toFixed(2)}</td>
+                                                <td>${yearCumulative.TP6}</td><td>${((yearCumulative.TP6/sumEval)*100).toFixed(2)}</td>
+                                            </tr>
+                                        `;
+
+                                        return subjectsRows + totalRow;
+                                    }).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <!-- Ringkasan Automatik Laporan Keseluruhan -->
+                        <div class="pt-6 border-t border-black space-y-4">
+                            <h3 class="text-xs font-bold uppercase tracking-wider text-slate-800">📌 RUMUSAN PRESTASI AKADEMIK KESELURUHAN (TAHUN 1 - 6)</h3>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div class="p-4 border border-black rounded bg-slate-50 space-y-2">
+                                    <p class="text-xs font-semibold">🏆 Mata Pelajaran Terbaik (TP3-TP6 Terbanyak): <span class="text-emerald-700 font-extrabold uppercase">BAHASA MELAYU</span></p>
+                                    <p class="text-xs font-semibold">⚠️ Mata Pelajaran Sasaran Intervensi: <span class="text-rose-700 font-extrabold uppercase">BAHASA INGGERIS</span></p>
+                                    <p class="text-xs font-semibold">⭐ Kategori Penguasaan Tertinggi: <span class="font-extrabold text-blue-800">Tahap Penguasaan 4 (TP4) & 5 (TP5)</span></p>
+                                </div>
+                                <div class="p-4 border border-black rounded bg-slate-50 space-y-2">
+                                    <p class="text-xs font-bold text-slate-800 uppercase">📋 Cadangan Pelan Tindakan:</p>
+                                    <ul class="list-disc pl-4 text-xs space-y-1">
+                                        <li>Mempertingkatkan sesi pengajaran bertumpu berasaskan modul digital DELIMa.</li>
+                                        <li>Melaksanakan program PLC berkala guru-guru subjek teras untuk penyeragaman TP.</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // --- ORIGINAL FORMAT EXCEL MENGIKUT KELAS & SUBJEK ---
+        function renderExcelReportMode() {
+            const stats = calculatePBDStatsForYear(analysisSelectedYearPBD);
+            const summary = generateAutomaticSummary(stats);
+
+            return `
+                <div class="space-y-6">
+                    <div class="bg-white p-4 rounded-xl border border-slate-100 shadow-sm flex flex-col md:flex-row items-center justify-between gap-3 no-print font-bold">
+                        <div class="flex items-center gap-3">
+                            <div class="space-y-1">
+                                <span class="text-[10px] font-bold text-slate-400 uppercase block">Pilih Tahun Analisis</span>
+                                <select onchange="analysisSelectedYearPBD=this.value; renderPage()" class="p-2 border border-slate-200 rounded-lg text-xs font-bold text-slate-700 outline-none">
+                                    <option value="1" ${analysisSelectedYearPBD==='1'?'selected':''}>Tahun 1</option>
+                                    <option value="2" ${analysisSelectedYearPBD==='2'?'selected':''}>Tahun 2</option>
+                                    <option value="3" ${analysisSelectedYearPBD==='3'?'selected':''}>Tahun 3</option>
+                                    <option value="4" ${analysisSelectedYearPBD==='4'?'selected':''}>Tahun 4</option>
+                                    <option value="5" ${analysisSelectedYearPBD==='5'?'selected':''}>Tahun 5</option>
+                                    <option value="6" ${analysisSelectedYearPBD==='6'?'selected':''}>Tahun 6</option>
+                                </select>
+                            </div>
+                            <div class="space-y-1">
+                                <span class="text-[10px] font-bold text-slate-400 uppercase block">Sesi</span>
+                                <select onchange="analysisSelectedAcademicYearPBD=this.value; renderPage()" class="p-2 border border-slate-200 rounded-lg text-xs font-bold text-slate-700 outline-none">
+                                    ${years.map(y => `<option value="${y}" ${analysisSelectedAcademicYearPBD===y?'selected':''}>${y}</option>`).join('')}
+                                </select>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <button onclick="exportExcelReport()" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg text-xs flex items-center gap-1.5 transition-all shadow-sm">
+                                <i data-lucide="file-spreadsheet" class="w-4 h-4"></i> Export Excel
+                            </button>
+                            <button onclick="printReport()" class="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white font-bold rounded-lg text-xs flex items-center gap-1.5 transition-all shadow-sm">
+                                <i data-lucide="printer" class="w-4 h-4"></i> Print Laporan
+                            </button>
+                        </div>
+                    </div>
+
+                    <div id="print-area" class="bg-white p-8 rounded-2xl border border-slate-100 shadow-sm excel-report-container space-y-6">
+                        <div class="text-center space-y-1 pb-4">
+                            <h2 class="text-lg font-bold uppercase tracking-tight">ANALISIS PENTAKSIRAN BILIK DARJAH (PBD)</h2>
+                            <h2 class="text-md font-bold uppercase tracking-tight">SESI AKADEMIK ${analysisSelectedAcademicYearPBD}</h2>
+                            <h2 class="text-sm font-bold uppercase tracking-tight">MENGIKUT KELAS</h2>
+                        </div>
+
+                        <div class="excel-bg-yellow py-1 text-center text-sm uppercase rounded tracking-wide border border-black max-w-xs mx-auto">
+                            TAHUN ${analysisSelectedYearPBD}
+                        </div>
+
+                        <div class="space-y-8 pt-4">
+                            ${baseSubjects.map(sub => {
+                                const subData = stats[sub];
+                                const al = subData['AL-KHAWARIZMI'];
+                                const alTot = al.Total || 1;
+                                const ar = subData['AR-RAZI'];
+                                const arTot = ar.Total || 1;
+                                const j = subData['JUMLAH'];
+                                const jTot = j.Total || 1;
+
+                                return `
+                                    <div class="space-y-1.5">
+                                        <div class="excel-bg-purple-subject py-1.5 border border-black text-xs uppercase font-bold pl-3">
+                                            MATA PELAJARAN: ${sub}
+                                        </div>
+                                        <table class="excel-table">
+                                            <thead>
+                                                <tr class="bg-slate-50 font-bold">
+                                                    <th class="w-12">Bil</th>
+                                                    <th class="text-left pl-3">Kelas</th>
+                                                    <th>TP1</th><th>%</th>
+                                                    <th>TP2</th><th>%</th>
+                                                    <th>TP3</th><th>%</th>
+                                                    <th>TP4</th><th>%</th>
+                                                    <th>TP5</th><th>%</th>
+                                                    <th>TP6</th><th>%</th>
+                                                    <th class="w-20">Jumlah</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <tr>
+                                                    <td>1</td>
+                                                    <td class="text-left pl-3 font-semibold">AL-KHAWARIZMI</td>
+                                                    <td>${al.TP1}</td><td>${((al.TP1/alTot)*100).toFixed(1)}%</td>
+                                                    <td>${al.TP2}</td><td>${((al.TP2/alTot)*100).toFixed(1)}%</td>
+                                                    <td>${al.TP3}</td><td>${((al.TP3/alTot)*100).toFixed(1)}%</td>
+                                                    <td>${al.TP4}</td><td>${((al.TP4/alTot)*100).toFixed(1)}%</td>
+                                                    <td>${al.TP5}</td><td>${((al.TP5/alTot)*100).toFixed(1)}%</td>
+                                                    <td>${al.TP6}</td><td>${((al.TP6/alTot)*100).toFixed(1)}%</td>
+                                                    <td class="font-bold">${al.Total}</td>
+                                                </tr>
+                                                <tr>
+                                                    <td>2</td>
+                                                    <td class="text-left pl-3 font-semibold">AR-RAZI</td>
+                                                    <td>${ar.TP1}</td><td>${((ar.TP1/arTot)*100).toFixed(1)}%</td>
+                                                    <td>${ar.TP2}</td><td>${((ar.TP2/arTot)*100).toFixed(1)}%</td>
+                                                    <td>${ar.TP3}</td><td>${((ar.TP3/arTot)*100).toFixed(1)}%</td>
+                                                    <td>${ar.TP4}</td><td>${((ar.TP4/arTot)*100).toFixed(1)}%</td>
+                                                    <td>${ar.TP5}</td><td>${((ar.TP5/arTot)*100).toFixed(1)}%</td>
+                                                    <td>${ar.TP6}</td><td>${((ar.TP6/arTot)*100).toFixed(1)}%</td>
+                                                    <td class="font-bold">${ar.Total}</td>
+                                                </tr>
+                                                <tr class="excel-bg-blue-total font-bold">
+                                                    <td></td>
+                                                    <td class="text-left pl-3">JUMLAH</td>
+                                                    <td>${j.TP1}</td><td>${((j.TP1/jTot)*100).toFixed(1)}%</td>
+                                                    <td>${j.TP2}</td><td>${((j.TP2/jTot)*100).toFixed(1)}%</td>
+                                                    <td>${j.TP3}</td><td>${((j.TP3/jTot)*100).toFixed(1)}%</td>
+                                                    <td>${j.TP4}</td><td>${((j.TP4/jTot)*100).toFixed(1)}%</td>
+                                                    <td>${j.TP5}</td><td>${((j.TP5/jTot)*100).toFixed(1)}%</td>
+                                                    <td>${j.TP6}</td><td>${((j.TP6/jTot)*100).toFixed(1)}%</td>
+                                                    <td>${j.Total}</td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                `;
+                            }).join('')}
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // --- PRESTASI INDIVIDU & RINGKASAN ORIGINAL ---
+        function renderAnalysisIndividu() {
+            const student = students.find(s => s.id == analysisSelectedStudentId) || students[0];
+            if (!student) {
+                return `<div class="p-6 bg-white border rounded-2xl text-center text-xs font-bold text-slate-400">Tiada data murid untuk dianalisis.</div>`;
+            }
+
+            const subjectsToUse = baseSubjects;
+
+            return `
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <div class="bg-white p-6 rounded-2xl border border-emerald-100 shadow-sm space-y-4">
+                        <div class="space-y-1">
+                            <label class="text-[10px] font-bold text-gray-400 uppercase">Pilih Murid</label>
+                            <select onchange="analysisSelectedStudentId=this.value; renderPage()" class="w-full p-2.5 border border-gray-100 rounded-xl text-xs font-bold text-slate-700 outline-none focus:ring-1 focus:ring-emerald-500">
+                                ${students.map(s => `<option value="${s.id}" ${s.id==analysisSelectedStudentId?'selected':''}>${s.nama} (${s.kelas})</option>`).join('')}
+                            </select>
+                        </div>
+
+                        <div class="p-4 bg-emerald-50/30 rounded-2xl border border-emerald-100/50 space-y-2">
+                            <div class="bg-emerald-600 text-white w-10 h-10 rounded-full flex items-center justify-center font-extrabold text-sm mb-2">${student.nama.charAt(0)}</div>
+                            <h4 class="font-bold text-slate-800 text-xs">${student.nama}</h4>
+                            <p class="text-[10px] text-slate-500 font-semibold">${student.ic}</p>
+                            <p class="text-[10px] text-emerald-700 font-extrabold bg-emerald-50 inline-block px-2.5 py-0.5 rounded-full">${student.kelas}</p>
+                        </div>
+                    </div>
+
+                    <div class="lg:col-span-2 bg-white p-6 rounded-2xl border border-emerald-100 shadow-sm space-y-4">
+                        <h3 class="font-bold text-slate-800 text-sm">Profil Akademik Pentaksiran UASA & PBD</h3>
+                        <div class="overflow-y-auto max-h-[300px] border border-slate-100 rounded-2xl">
+                            <table class="w-full text-left border-collapse text-xs">
+                                <thead>
+                                    <tr class="bg-slate-50 border-b border-slate-100 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                                        <th class="p-3">Matapelajaran</th>
+                                        <th class="p-3 text-center">Markah</th>
+                                        <th class="p-3 text-center">Gred</th>
+                                        <th class="p-3 text-center">PBD TP</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-100">
+                                    ${subjectsToUse.map(sub => {
+                                        const key = `${student.id}_${selectedYear}_${analysisSelectedAssessment}_${sub}`;
+                                        const score = studentMarks[key];
+                                        const pbdVal = studentPBD[key] || '-';
+                                        const gradeRes = calculateUASAGrade(score);
+
+                                        return `
+                                            <tr>
+                                                <td class="p-3 font-bold text-slate-700">${sub}</td>
+                                                <td class="p-3 text-center font-bold text-slate-800">${score !== undefined ? score + '%' : '-'}</td>
+                                                <td class="p-3 text-center">
+                                                    <span class="inline-block px-2 py-0.5 rounded-full font-bold text-[9px] border ${gradeRes.color}">${gradeRes.grade}</span>
+                                                </td>
+                                                <td class="p-3 text-center"><span class="font-extrabold text-teal-600 bg-teal-50 px-2.5 py-0.5 rounded-full text-[9px]">${pbdVal}</span></td>
+                                            </tr>
+                                        `;
+                                    }).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // --- PERFORMANCE / RENDER FOR PBD RINGKASAN ---
+        function renderAnalysisPBD() {
+            return `
+                <div class="bg-white p-6 rounded-2xl border border-emerald-100 shadow-sm space-y-4">
+                    <h3 class="font-bold text-slate-800 text-sm">Ringkasan Analisis Tahap Penguasaan (TP) PBD</h3>
+                    <p class="text-xs text-slate-500 font-medium">Berdasarkan data pentaksiran yang disimpan, berikut adalah statistik purata pencapaian TP bagi kelas ${selectedClass}:</p>
+                    <div class="grid grid-cols-2 md:grid-cols-6 gap-3 pt-3">
+                        ${['TP1','TP2','TP3','TP4','TP5','TP6'].map((tp, idx) => {
+                            const count = Object.values(studentPBD).filter(v => v === tp).length;
+                            return `
+                                <div class="p-4 border border-slate-100/80 bg-slate-50/30 rounded-2xl text-center space-y-1">
+                                    <span class="text-xs font-bold text-emerald-600">${tp}</span>
+                                    <h4 class="text-xl font-black text-slate-800">${count}</h4>
+                                    <p class="text-[9px] text-slate-400 font-bold uppercase">Subjek Murid</p>
+                                </div>
+                            `;
+                        }).join('')}
+                    </div>
+                </div>
+            `;
+        }
+
+        // --- WINDOW BOOTSTRAP ---
+        window.onload = function() {
+            initSupabase();
+            lucide.createIcons();
+            renderPage();
+        };
+    </script>
+    <script>
+   (function() {
+    'use strict';
+
+    // 1. PENGURUSAN KLIK KANAN (CONTEXT MENU)
+    document.addEventListener('contextmenu', function(e) {
+        // Hanya benarkan klik kanan jika berada di dalam elemen '.dalam-sistem'
+        if (e.target.closest('.dalam-sistem')) {
+            return true; 
+        } else {
+            e.preventDefault(); // Lock bahagian lain secara senyap
+        }
+    });
+
+    // 2. PENGURUSAN PINTASAN PAPAN KEKUNCI (KEYBOARD)
+    document.addEventListener('keydown', function(e) {
+        const isDalamSistem = e.target.closest('.dalam-sistem');
+
+        // LOCK fungsi salin (Ctrl+C / Ctrl+X) jika pengguna berada di LUAR sistem
+        if (!isDalamSistem && (e.ctrlKey || e.metaKey) && (e.key === 'c' || e.key === 'x')) {
+            e.preventDefault();
+            return false;
+        }
+
+        // LOCK GLOBAL (Sentiasa sekat Inspect Element & View Source di mana-mana bahagian pun)
+        if ((e.ctrlKey || e.metaKey) && e.key === 'u') { // Ctrl+U (View Source)
+            e.preventDefault();
+            return false;
+        }
+        if ((e.ctrlKey || e.metaKey) && e.key === 's') { // Ctrl+S (Save Page)
+            e.preventDefault();
+            return false;
+        }
+        if ( // F12 & Ctrl+Shift+I/J/C (Inspect Element)
+            e.key === 'F12' || 
+            ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'I' || e.key === 'J' || e.key === 'C'))
+        ) {
+            e.preventDefault();
+            return false;
+        }
+    });
+
+    // 3. ANTI-DEBUGGER (Lock Inspect Element daripada diceroboh melalui menu browser)
+    function antiDebug(i) {
+        if (("" + i / i).length !== 1 || i % 20 === 0) {
+            (function() {}).constructor("debugger")();
+        } else {
+            (function() {}).constructor("debugger")();
+        }
+        antiDebug(++i);
+    }
+    try {
+        setInterval(function() {
+            antiDebug(0);
+        }, 50);
+    } catch (e) {}
+
+})();
+    </script>    
+</body>
+</html>
