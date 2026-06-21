@@ -240,7 +240,7 @@
         // --- SUPABASE CONFIG ---
         // GANTI dengan Project URL dan Anon Key daripada Supabase > Project Settings > API.
         const SUPABASE_URL = "https://zrjqqfalpmwfvacqscnf.supabase.co";
-        const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpyanFxZmFscG13dmZhY3FzY25mIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc0MzA2NDgsImV4cCI6MjA5MzAwNjY0OH0.ZvoqRTy1d3iyjC1O_9ePR8LDHS7skjA-eprCHu9es3o";
+        const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpyanFxZmFscG13dmZhY3FzY25mIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc0MzA2NDgsImV4cCI6MjA5MzAwNjY0OH0.ZvoqRTy1d3iyjC1O_9ePR8LDHS7skjA-eprCHu9es3o"; // Masukkan anon public key Supabase di sini
 
         let supabase = null;
         let supabaseEnabled = false;
@@ -371,7 +371,13 @@
                 });
 
                 supabaseEnabled = true;
-                await fetchAllDataFromSupabase();
+
+                // Jangan ambil data sebelum login kerana RLS hanya benarkan pengguna authenticated.
+                const { data: sessionData } = await supabase.auth.getSession();
+                if (sessionData && sessionData.session) {
+                    await fetchAllDataFromSupabase();
+                }
+
                 console.log('Supabase initialized successfully');
             } catch (e) {
                 supabaseEnabled = false;
@@ -672,6 +678,10 @@
             }
 
             if (!supabaseEnabled || !supabase) {
+                await initSupabase();
+            }
+
+            if (!supabaseEnabled || !supabase) {
                 showError('Supabase belum disambungkan. Sila lengkapkan SUPABASE_ANON_KEY dahulu.');
                 return;
             }
@@ -704,7 +714,7 @@
                 showToast(`Log masuk berjaya sebagai ${currentUser.role}: ${currentUser.name}!`, 'success');
             } catch (err) {
                 console.error('Login Supabase gagal:', err);
-                showError('Log masuk gagal. Semak emel, kata laluan dan akaun Supabase Auth.');
+                showError('Log masuk gagal: ' + (err.message || 'Semak emel, kata laluan dan akaun Supabase Auth.'));
             }
         }
 
@@ -1916,8 +1926,8 @@
         }
 
         // --- WINDOW BOOTSTRAP ---
-        window.onload = function() {
-            initSupabase();
+        window.onload = async function() {
+            await initSupabase();
             lucide.createIcons();
             renderPage();
         };
