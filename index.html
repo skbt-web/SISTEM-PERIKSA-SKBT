@@ -733,7 +733,7 @@ const { data: teacher } = await supabaseClient
   .from("teachers")
   .select("name")
   .eq("email", emailGuru)
-  .maybesingle();
+  .maybeSingle();
                 
   console.log("emailGuru =", emailGuru);
 console.log("teacher =", teacher);
