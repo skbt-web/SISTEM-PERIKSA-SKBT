@@ -388,7 +388,7 @@
         async function fetchAllDataFromSupabase() {
             if (!supabaseEnabled || !supabaseClient) return;
             try {
-                const { data: studentRows, error: studentError } = await supabase
+                const { data: studentRows, error: studentError } = await supabaseClient
                     .from('students')
                     .select('id,nama,ic,kelas')
                     .order('kelas', { ascending: true })
@@ -466,7 +466,7 @@
                     updated_at: new Date().toISOString()
                 }));
 
-                const { error } = await supabase
+                const { error } = await supabaseClient
                     .from('students')
                     .upsert(rows, { onConflict: 'ic' });
                 if (error) throw error;
@@ -479,7 +479,7 @@
         async function deleteStudentFromSupabase(id) {
             if (!supabaseEnabled || !supabaseClient) return;
             try {
-                const { error } = await supabase
+                const { error } = await supabaseClient
                     .from('students')
                     .delete()
                     .eq('id', id);
@@ -494,13 +494,13 @@
             if (!supabaseEnabled || !supabaseClient) return;
             try {
                 if (markRows.length > 0) {
-                    const { error } = await supabase
+                    const { error } = await supabaseClient
                         .from('marks')
                         .upsert(markRows, { onConflict: 'student_id,tahun,assessment,subject' });
                     if (error) throw error;
                 }
                 if (pbdRows.length > 0) {
-                    const { error } = await supabase
+                    const { error } = await supabaseClient
                         .from('pbd')
                         .upsert(pbdRows, { onConflict: 'student_id,tahun,assessment,subject' });
                     if (error) throw error;
