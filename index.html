@@ -677,11 +677,11 @@
                 return;
             }
 
-            if (!supabaseEnabled || !supabaseClientClient) {
+            if (!supabaseEnabled || !supabaseClient) {
                 await initSupabase();
             }
 
-            if (!supabaseEnabled || !supabaseClientClient) {
+            if (!supabaseEnabled || !supabaseClient) {
                 showError('Supabase belum disambungkan. Sila lengkapkan SUPABASE_ANON_KEY dahulu.');
                 return;
             }
