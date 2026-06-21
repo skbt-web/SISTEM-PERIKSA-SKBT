@@ -294,6 +294,9 @@
             '15_2026_PENTAKSIRAN SUMATIF 1_MATEMATIK': 10
         };
 
+        // Metadata markah daripada Supabase untuk semakan status pengisian
+        const markMeta = {};
+
         // Database PBD Semasa Sementara (In-Memory) yang merangkumi Tahun 1 - 6
         const studentPBD = {
             // Tahun 1
@@ -407,18 +410,25 @@
                     });
                 }
 
-                const { data: markRows, error: markError } = await supabase
+                const { data: markRows, error: markError } = await supabaseClient
                     .from('marks')
-                    .select('key,value');
+                    .select('key,value,teacher_email,updated_at');
                 if (markError) throw markError;
                 if (markRows) {
                     Object.keys(studentMarks).forEach(k => delete studentMarks[k]);
+                    Object.keys(markMeta).forEach(k => delete markMeta[k]);
                     markRows.forEach(row => {
-                        if (row.key) studentMarks[row.key] = row.value;
+                        if (row.key) {
+                            studentMarks[row.key] = row.value;
+                            markMeta[row.key] = {
+                                teacher_email: row.teacher_email || '',
+                                updated_at: row.updated_at || ''
+                            };
+                        }
                     });
                 }
 
-                const { data: pbdRows, error: pbdError } = await supabase
+                const { data: pbdRows, error: pbdError } = await supabaseClient
                     .from('pbd')
                     .select('key,value');
                 if (pbdError) throw pbdError;
@@ -437,7 +447,7 @@
         async function persistStudentToSupabase(student) {
             if (!supabaseEnabled || !supabaseClient) return;
             try {
-                const { error } = await supabase
+                const { error } = await supabaseClient
                     .from('students')
                     .upsert({
                         id: student.id,
@@ -934,6 +944,10 @@
                         const num = parseFloat(markVal);
                         if (!isNaN(num) && num >= 0 && num <= 100) {
                             studentMarks[key] = num;
+                            markMeta[key] = {
+                                teacher_email: currentUser ? currentUser.email : '',
+                                updated_at: new Date().toISOString()
+                            };
                             markRows.push({
                                 key,
                                 student_id: String(keyInfo.student_id),
@@ -1119,6 +1133,160 @@
             }
         }
 
+
+        // --- SEMAKAN STATUS PENGISIAN GURU ---
+        function formatLocalDateTime(value) {
+            if (!value) return '-';
+            try {
+                return new Date(value).toLocaleString('ms-MY', {
+                    day: '2-digit', month: '2-digit', year: 'numeric',
+                    hour: '2-digit', minute: '2-digit'
+                });
+            } catch (e) {
+                return '-';
+            }
+        }
+
+        function getCompletionRows(filterClass = null) {
+            const rows = [];
+            const targetClasses = filterClass ? [filterClass] : classes;
+
+            targetClasses.forEach(cls => {
+                const classStudents = students.filter(s => s.kelas === cls);
+                const totalStudents = classStudents.length;
+                if (totalStudents === 0) return;
+
+                baseSubjects.forEach(subject => {
+                    let filled = 0;
+                    const teacherSet = new Set();
+                    let latestUpdate = '';
+
+                    classStudents.forEach(st => {
+                        const key = `${st.id}_${selectedYear}_${selectedAssessment}_${subject}`;
+                        const mark = studentMarks[key];
+                        const hasMark = mark !== undefined && mark !== null && mark !== '';
+
+                        if (hasMark) {
+                            filled++;
+                            const meta = markMeta[key] || {};
+                            if (meta.teacher_email) teacherSet.add(meta.teacher_email);
+                            if (meta.updated_at && (!latestUpdate || new Date(meta.updated_at) > new Date(latestUpdate))) {
+                                latestUpdate = meta.updated_at;
+                            }
+                        }
+                    });
+
+                    const percent = totalStudents > 0 ? Math.round((filled / totalStudents) * 100) : 0;
+                    const status = filled === totalStudents && totalStudents > 0 ? 'SIAP' : (filled > 0 ? 'SEBAHAGIAN' : 'BELUM MULA');
+                    rows.push({
+                        teacher: Array.from(teacherSet).join(', ') || '-',
+                        kelas: cls,
+                        subject,
+                        assessment: selectedAssessment,
+                        totalStudents,
+                        filled,
+                        percent,
+                        status,
+                        latestUpdate
+                    });
+                });
+            });
+
+            return rows;
+        }
+
+        function getStatusBadge(row) {
+            if (row.status === 'SIAP') {
+                return `<span class="bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-1 rounded-full text-[10px] font-bold">✅ SIAP</span>`;
+            }
+            if (row.status === 'SEBAHAGIAN') {
+                return `<span class="bg-amber-50 text-amber-700 border border-amber-200 px-2 py-1 rounded-full text-[10px] font-bold">🟡 SEBAHAGIAN</span>`;
+            }
+            return `<span class="bg-rose-50 text-rose-700 border border-rose-200 px-2 py-1 rounded-full text-[10px] font-bold">🔴 BELUM MULA</span>`;
+        }
+
+        function renderCompletionStatusPanel(mode = 'admin', filterClass = null) {
+            const rows = getCompletionRows(filterClass);
+            const totalItems = rows.length;
+            const siap = rows.filter(r => r.status === 'SIAP').length;
+            const sebahagian = rows.filter(r => r.status === 'SEBAHAGIAN').length;
+            const belum = rows.filter(r => r.status === 'BELUM MULA').length;
+            const overall = totalItems > 0 ? Math.round((siap / totalItems) * 100) : 0;
+            const shownRows = mode === 'admin' ? rows : rows.filter(r => r.status !== 'BELUM MULA' || r.filled > 0 || filterClass);
+
+            return `
+                <div class="bg-white p-6 rounded-2xl border border-emerald-100 shadow-sm space-y-4">
+                    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                        <div>
+                            <h3 class="font-bold text-gray-800 text-base flex items-center gap-2">
+                                <i data-lucide="clipboard-check" class="w-5 h-5 text-emerald-600"></i>
+                                Semakan Pengisian Guru
+                            </h3>
+                            <p class="text-[11px] text-gray-400 font-medium">Paparan nama guru, kelas dan mata pelajaran yang telah siap diisi bagi ${selectedAssessment} ${selectedYear}.</p>
+                        </div>
+                        <div class="flex flex-wrap items-center gap-2 no-print">
+                            <select onchange="selectedYear=this.value; renderPage()" class="p-2 border border-slate-200 rounded-lg text-xs font-bold text-slate-700 outline-none">
+                                ${years.map(y => `<option value="${y}" ${selectedYear===y?'selected':''}>${y}</option>`).join('')}
+                            </select>
+                            <select onchange="selectedAssessment=this.value; renderPage()" class="p-2 border border-slate-200 rounded-lg text-xs font-bold text-slate-700 outline-none max-w-[220px]">
+                                ${assessments.map(a => `<option value="${a}" ${selectedAssessment===a?'selected':''}>${a}</option>`).join('')}
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                        <div class="bg-emerald-50/70 border border-emerald-100 p-4 rounded-2xl">
+                            <p class="text-[10px] font-bold text-emerald-700 uppercase">Siap</p>
+                            <p class="text-2xl font-extrabold text-emerald-800">${siap}</p>
+                        </div>
+                        <div class="bg-amber-50/70 border border-amber-100 p-4 rounded-2xl">
+                            <p class="text-[10px] font-bold text-amber-700 uppercase">Sebahagian</p>
+                            <p class="text-2xl font-extrabold text-amber-800">${sebahagian}</p>
+                        </div>
+                        <div class="bg-rose-50/70 border border-rose-100 p-4 rounded-2xl">
+                            <p class="text-[10px] font-bold text-rose-700 uppercase">Belum Mula</p>
+                            <p class="text-2xl font-extrabold text-rose-800">${belum}</p>
+                        </div>
+                        <div class="bg-slate-50 border border-slate-100 p-4 rounded-2xl">
+                            <p class="text-[10px] font-bold text-slate-500 uppercase">Peratus Siap</p>
+                            <p class="text-2xl font-extrabold text-slate-800">${overall}%</p>
+                        </div>
+                    </div>
+
+                    <div class="overflow-x-auto border border-slate-100 rounded-2xl max-h-[520px] overflow-y-auto">
+                        <table class="w-full text-left border-collapse text-xs">
+                            <thead class="sticky top-0 z-10">
+                                <tr class="bg-slate-50 text-[10px] font-bold text-slate-500 uppercase tracking-wider border-b border-slate-100">
+                                    <th class="p-3">Nama Guru / Emel</th>
+                                    <th class="p-3">Kelas</th>
+                                    <th class="p-3">Mata Pelajaran</th>
+                                    <th class="p-3">Pentaksiran</th>
+                                    <th class="p-3 text-center">Diisi</th>
+                                    <th class="p-3 text-center">%</th>
+                                    <th class="p-3">Kemaskini</th>
+                                    <th class="p-3 text-center">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-50">
+                                ${shownRows.map(row => `
+                                    <tr class="hover:bg-slate-50/70">
+                                        <td class="p-3 font-semibold text-slate-700 max-w-[220px] truncate">${row.teacher}</td>
+                                        <td class="p-3 font-bold text-emerald-700 whitespace-nowrap">${row.kelas}</td>
+                                        <td class="p-3 font-semibold text-slate-700 min-w-[180px]">${row.subject}</td>
+                                        <td class="p-3 text-slate-500 min-w-[170px]">${row.assessment}</td>
+                                        <td class="p-3 text-center font-bold">${row.filled}/${row.totalStudents}</td>
+                                        <td class="p-3 text-center font-bold">${row.percent}%</td>
+                                        <td class="p-3 text-slate-500 whitespace-nowrap">${formatLocalDateTime(row.latestUpdate)}</td>
+                                        <td class="p-3 text-center whitespace-nowrap">${getStatusBadge(row)}</td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            `;
+        }
+
         // --- RENDER DYNAMIC PAGES ---
         function renderPage() {
             const content = document.getElementById('page-content');
@@ -1192,6 +1360,7 @@
                                 </div>
                             </div>
                         </div>
+                        ${isAdmin ? renderCompletionStatusPanel('admin') : ''}
                     </div>
                 `;
             }
@@ -1474,6 +1643,8 @@
                             </div>
                             <i data-lucide="presentation" class="absolute right-6 bottom-4 w-24 h-24 opacity-10 rotate-6"></i>
                         </div>
+
+                        ${renderCompletionStatusPanel('guru_kelas', assignedClass)}
 
                         <div class="bg-white p-6 rounded-2xl border border-emerald-100 shadow-sm space-y-4">
                             <h3 class="font-bold text-gray-800 text-sm flex items-center gap-1.5"><i data-lucide="users" class="w-5 h-5 text-teal-600"></i> Senarai Roster Kelas (${classStudents.length} Murid)</h3>
