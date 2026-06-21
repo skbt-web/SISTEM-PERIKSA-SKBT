@@ -727,6 +727,9 @@
 
                 isAdmin = type === 'admin';
                 await fetchAllDataFromSupabase();
+                let namaGuru = "Guru";
+                
+                try{
                 const emailGuru = (await supabaseClient.auth.getUser()).data.user.email;
 
 const { data: teacher,error } = await supabaseClient
@@ -734,15 +737,21 @@ const { data: teacher,error } = await supabaseClient
   .select("name")
   .eq("email", emailGuru)
   .maybeSingle();
+
+if (!teacherError && teacher?.name) {
+    namaGuru = teacher.name;
+  }
+} catch (e) {
+  console.error("Ralat ambil nama guru:", e);
+}
+           
+currentUser.name = namaGuru;
+currentUser.fullName = namaGuru;
                 
-console.log("Email login =", emailGuru);
-console.log("Teacher =", teacher);
-console.log("Error =", error);
-                
-currentUser.name = teacher?.name || "Guru";
-currentUser.fullName = currentUser?.name;
                 showApp();
+                
                 showToast(`👋 Selamat datang, ${currentUser.name}!`, 'success');
+                
             } catch (err) {
                 console.error('Login Supabase gagal:', err);
                 showError('Log masuk gagal: ' + (err.message || 'Semak emel, kata laluan dan akaun Supabase Auth.'));
