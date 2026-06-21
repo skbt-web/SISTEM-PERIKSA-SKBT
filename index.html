@@ -1932,51 +1932,6 @@
             renderPage();
         };
     </script>
-    <script>
-   (function() {
-    'use strict';
 
-    // 1. PENGURUSAN KLIK KANAN (CONTEXT MENU)
-    document.addEventListener('contextmenu', function(e) {
-        // Hanya benarkan klik kanan jika berada di dalam elemen '.dalam-sistem'
-        if (e.target.closest('.dalam-sistem')) {
-            return true; 
-        } else {
-            e.preventDefault(); // Lock bahagian lain secara senyap
-        }
-    });
-
-    // 2. PENGURUSAN PINTASAN PAPAN KEKUNCI (KEYBOARD)
-    document.addEventListener('keydown', function(e) {
-        const isDalamSistem = e.target.closest('.dalam-sistem');
-
-        // LOCK fungsi salin (Ctrl+C / Ctrl+X) jika pengguna berada di LUAR sistem
-        if (!isDalamSistem && (e.ctrlKey || e.metaKey) && (e.key === 'c' || e.key === 'x')) {
-            e.preventDefault();
-            return false;
-        }
-
-        // LOCK GLOBAL (Sentiasa sekat Inspect Element & View Source di mana-mana bahagian pun)
-        if ((e.ctrlKey || e.metaKey) && e.key === 'u') { // Ctrl+U (View Source)
-            e.preventDefault();
-            return false;
-        }
-        if ((e.ctrlKey || e.metaKey) && e.key === 's') { // Ctrl+S (Save Page)
-            e.preventDefault();
-            return false;
-        }
-        if ( // F12 & Ctrl+Shift+I/J/C (Inspect Element)
-            e.key === 'F12' || 
-            ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'I' || e.key === 'J' || e.key === 'C'))
-        ) {
-            e.preventDefault();
-            return false;
-        }
-    });
-
-    // 3. ANTI-DEBUGGER dinyahaktifkan kerana loop rekursif menyebabkan fungsi login tersekat.
-
-})();
-    </script>    
 </body>
 </html>
