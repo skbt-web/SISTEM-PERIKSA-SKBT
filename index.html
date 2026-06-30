@@ -84,6 +84,18 @@
         .tp5-col { background-color: #E0F2F1 !important; }
         .tp6-col { background-color: #F3E5F5 !important; }
 
+
+
+        /* --- TEMA PELBAGAI WARNA SISMAR --- */
+        .theme-card-blue { background: linear-gradient(135deg,#2563eb,#4f46e5); }
+        .theme-card-purple { background: linear-gradient(135deg,#7c3aed,#db2777); }
+        .theme-card-orange { background: linear-gradient(135deg,#f97316,#f59e0b); }
+        .theme-card-cyan { background: linear-gradient(135deg,#06b6d4,#2563eb); }
+        .theme-soft-blue { background:#eff6ff; color:#1d4ed8; }
+        .theme-soft-purple { background:#faf5ff; color:#7e22ce; }
+        .theme-soft-orange { background:#fff7ed; color:#c2410c; }
+        .theme-soft-cyan { background:#ecfeff; color:#0e7490; }
+
         /* --- PRINT MEDIA LAYOUT (A4 LANDSCAPE) --- */
         @media print {
             body {
@@ -251,12 +263,12 @@
 
     </style>
 </head>
-<body class="bg-emerald-50/30 min-h-screen">
+<body class="bg-slate-100 min-h-screen">
 
     <!-- HALAMAN LOGIN -->
-    <div id="login-page" class="min-h-screen bg-emerald-50 flex items-center justify-center p-4">
-        <div class="max-w-md w-full bg-white rounded-2xl shadow-xl overflow-hidden border border-emerald-100">
-            <div class="bg-emerald-600 p-8 text-white text-center">
+    <div id="login-page" class="min-h-screen bg-blue-50 flex items-center justify-center p-4">
+        <div class="max-w-md w-full bg-white rounded-2xl shadow-xl overflow-hidden border border-blue-100">
+            <div class="bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 p-8 text-white text-center">
                 <div class="bg-white w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg overflow-hidden border-2 border-white">
                     <img src="logo.png" alt="Logo SK Bukit Tongkat" class="w-20 h-20 object-contain" onerror="this.src='https://placehold.co/100x100?text=LOGO'">
                 </div>
@@ -271,19 +283,19 @@
                         <label class="text-sm font-semibold text-gray-700 flex items-center gap-2">
                             <i data-lucide="user" class="w-4 h-4"></i> Emel DELIMa
                         </label>
-                        <input id="email" type="email" required class="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none text-sm" placeholder="g-xxxxxxxx@moe-dl.edu.my">
+                        <input id="email" type="email" required class="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm" placeholder="g-xxxxxxxx@moe-dl.edu.my">
                     </div>
                     <div class="space-y-2">
                         <label class="text-sm font-semibold text-gray-700 flex items-center gap-2">
                             <i data-lucide="lock" class="w-4 h-4"></i> Kata Laluan
                         </label>
-                        <input id="password" type="password" required class="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none text-sm" placeholder="********">
+                        <input id="password" type="password" required class="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm" placeholder="********">
                     </div>
                     <div class="grid grid-cols-1 gap-3">
-                        <button type="button" onclick="handleLogin('guru')" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-xl transition-all shadow-md">
+                        <button type="button" onclick="handleLogin('guru')" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl transition-all shadow-md">
                             Log Masuk Guru
                         </button>
-                        <button type="button" onclick="handleLogin('guru_kelas')" class="w-full bg-teal-600 hover:bg-teal-700 text-white font-bold py-3 rounded-xl transition-all shadow-md flex items-center justify-center gap-2">
+                        <button type="button" onclick="handleLogin('guru_kelas')" class="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 rounded-xl transition-all shadow-md flex items-center justify-center gap-2">
                             <i data-lucide="presentation" class="w-5 h-5"></i> Log Masuk Guru Kelas
                         </button>
                         <button type="button" onclick="handleLogin('admin')" class="w-full bg-slate-800 hover:bg-slate-900 text-white font-semibold py-3 rounded-xl transition-all flex items-center justify-center gap-2">
@@ -301,15 +313,15 @@
         <div id="sidebar-overlay" onclick="toggleSidebar()" class="hidden fixed inset-0 bg-black/50 z-40"></div>
 
         <!-- Sidebar -->
-        <aside id="sidebar" class="fixed inset-y-0 left-0 w-64 bg-white border-r border-emerald-100 flex flex-col p-6 shadow-sm shrink-0 z-50 closed">
+        <aside id="sidebar" class="fixed inset-y-0 left-0 w-64 bg-white border-r border-blue-100 flex flex-col p-6 shadow-sm shrink-0 z-50 closed">
             <div class="flex items-center justify-between mb-10 px-2 lg:block">
                 <div class="flex items-center gap-3">
-                    <div class="bg-white p-1 rounded-lg shadow-sm border border-emerald-100 shrink-0">
+                    <div class="bg-white p-1 rounded-lg shadow-sm border border-blue-100 shrink-0">
                         <img src="logo.png" alt="Logo" class="w-10 h-10 object-contain" onerror="this.src='https://placehold.co/40x40?text=LOGO'">
                     </div>
                     <span class="font-bold text-gray-800 text-lg uppercase leading-tight">SK Bukit<br/>Tongkat</span>
                 </div>
-                <button onclick="toggleSidebar()" class="p-2 text-gray-400 hover:bg-emerald-50 hover:text-emerald-700 rounded-xl transition-all" title="Tutup Menu">
+                <button onclick="toggleSidebar()" class="p-2 text-gray-400 hover:bg-blue-50 hover:text-blue-700 rounded-xl transition-all" title="Tutup Menu">
                     <i data-lucide="panel-left-close" class="w-5 h-5"></i>
                 </button>
             </div>
@@ -318,7 +330,7 @@
                 <!-- Item Navigasi Dimuat Dinamis -->
             </nav>
 
-            <div class="mt-auto pt-6 border-t border-emerald-50">
+            <div class="mt-auto pt-6 border-t border-blue-50">
                 <div class="flex items-center gap-3 mb-4 px-2">
                     <div id="user-avatar" class="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold shadow-sm animate-pulse"></div>
                     <div class="overflow-hidden">
@@ -334,9 +346,9 @@
 
         <!-- Area Konten -->
         <main class="flex-grow flex flex-col h-screen w-full min-w-0">
-            <header class="h-16 bg-white border-b border-emerald-100 flex items-center justify-between px-4 md:px-8 shrink-0 shadow-sm z-30 font-bold">
+            <header class="h-16 bg-white border-b border-blue-100 flex items-center justify-between px-4 md:px-8 shrink-0 shadow-sm z-30 font-bold">
                 <div class="flex items-center gap-3">
-                    <button onclick="toggleSidebar()" class="p-2 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-xl transition-all focus:outline-none flex items-center gap-1.5 px-3 border border-emerald-200" title="Togol Bar Sisi">
+                    <button onclick="toggleSidebar()" class="p-2 text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-xl transition-all focus:outline-none flex items-center gap-1.5 px-3 border border-blue-200" title="Togol Bar Sisi">
                         <i data-lucide="panel-left" class="w-5 h-5"></i>
                         <span class="text-xs font-bold uppercase tracking-wider hidden sm:inline">Menu</span>
                     </button>
@@ -363,10 +375,15 @@
             <p class="text-xs text-slate-500 font-medium leading-relaxed">Adakah anda pasti untuk mendaftar murid ini ke dalam sistem?</p>
             <div class="flex items-center justify-end gap-2.5 pt-2">
                 <button onclick="closeConfirmModal(false)" class="px-4 py-2 text-xs font-bold text-slate-500 bg-slate-50 hover:bg-slate-100 rounded-xl transition-all">Tidak</button>
-                <button onclick="closeConfirmModal(true)" class="px-5 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl transition-all shadow-md">Ya</button>
+                <button onclick="closeConfirmModal(true)" class="px-5 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl transition-all shadow-md">Ya</button>
             </div>
         </div>
     </div>
+
+
+    <!-- MODAL EDIT / UPDATE PENGISIAN GURU OLEH ADMIN -->
+    <div id="admin-edit-filling-modal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"></div>
+
 
     <!-- NOTIFIKASI TOAST -->
     <div id="toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 pointer-events-none"></div>
@@ -396,7 +413,7 @@
         ];
         const assessments = ['PENTAKSIRAN SUMATIF 1', 'PENTAKSIRAN SUMATIF 2', 'UJIAN AKHIR SESI AKADEMIK (UASA)'];
         
-        // 9 Matapelajaran mengikut etert.jpg
+        // 9 Mata Pelajaran mengikut etert.jpg
         const baseSubjects = [
             'BAHASA ARAB', 'BAHASA INGGERIS', 'BAHASA MELAYU', 'MATEMATIK', 'SAINS', 
             'PENDIDIKAN ISLAM', 'PENDIDIKAN JASMANI DAN KESIHATAN', 'MUZIK', 'PENDIDIKAN SENI VISUAL', 'SEJARAH', 'REKA BENTUK TEKNOLOGI'
@@ -412,6 +429,30 @@
             'DAYANG NURFARAHAIN FAEEZA BINTI HASSIM', 'NORZAIMAH BINTI ZAKARIA', 'RAZIDAH BINTI MOHAMAD',
             'NOOR HASLINDA BT. MOHD NASIRAN', 'SITI NOOR FAKHARIYAH BINTI MD SHAHID', 'VEETIYAH A/P SUROMUTHU'
         ];
+
+        // Tetapan rasmi Guru Kelas dan Pembantu Guru Kelas.
+        // Struktur asal dikekalkan. Senarai ini hanya digunakan untuk menapis Dashboard Guru Kelas.
+        const classTeacherAssignments = [
+            { kelas: '1 AR-RAZI', guru_kelas: 'PN. HJH. RUMINI BT. TUKIMAN', pembantu: 'PN. ADLIN FAZLINDA BINTI ASNAN' },
+            { kelas: '1 AL-KHAWARIZMI', guru_kelas: 'PN. PSPA LAILA BINTI OTHMAN', pembantu: 'PN. DAYANG NURFARAHAIN FAEEZA BINTI HASSIM' },
+            { kelas: '2 AR-RAZI', guru_kelas: 'PN. RAZIDAH BINTI MOHAMED', pembantu: 'PN. NOOR HASLINDA BINTI MOHD NASIRAN' },
+            { kelas: '2 AL-KHAWARIZMI', guru_kelas: 'CIK NURUL NAJIHAH BINTI SAHLAN', pembantu: 'EN. MOHD NOOR RASHID BIN WAGIMAN' },
+            { kelas: '3 AR-RAZI', guru_kelas: 'PN. SITI NOOR FAKHARIAH BINTI MD SHAHID', pembantu: '-' },
+            { kelas: '3 AL-KHAWARIZMI', guru_kelas: 'PN. MAISARATUL SYABRINA IZZATI BINTI MUHAMAD SHUKRI', pembantu: 'EN. MUZAFFAR AHMAD BIN ZAINAL ABIDIN' },
+            { kelas: '4 AR-RAZI', guru_kelas: 'PN. NORSAADAH BINTI JAILANI', pembantu: 'PN. ROSELINDA BINTI LAZIM' },
+            { kelas: '4 AL-KHAWARIZMI', guru_kelas: 'PN. HJH. NORZAIMAH BT. ZAKARIA', pembantu: 'PN. NORMAZIDA BINTI AHMAD' },
+            { kelas: '5 AR-RAZI', guru_kelas: 'EN. MOHAMAD HIJRAN BIN AHMAD IDRUS', pembantu: 'PN. VEETIYAH A/P SUROMUTHU' },
+            { kelas: '6 AR-RAZI', guru_kelas: 'PN. NORAZLINAWATI BT. MAHMOOD', pembantu: 'EN. KHAIRULAZMAN BIN DOLLAH' },
+            { kelas: '6 AL-KHAWARIZMI', guru_kelas: 'EN. ZULKARNAIN BIN M. AYOB', pembantu: 'PN. SYAHMINA WARDAH BINTI SUARDI' }
+        ];
+
+        function normalizeTeacherName(value) {
+            return String(value || '')
+                .toUpperCase()
+                .replace(/\b(PN|PUAN|EN|ENCIK|CIK|HJH|HJ|BT|BIN|BINTI)\.?\b/g, '')
+                .replace(/[^A-Z0-9]/g, '')
+                .trim();
+        }
 
         // Database Markah Sementara (In-Memory)
         const studentMarks = {
@@ -485,6 +526,10 @@
         let tempUploadedStudents = [];
         let markStatusRows = [];
         let pbdStatusRows = [];
+        let classVerificationRows = [];
+        let classTeacherRows = [];
+        let teacherDirectoryRows = [];
+        let guruKelasSelectedClass = '';
         // --- SUPABASE DATABASE SETUP ---
         function parseKey(key) {
             const parts = String(key).split('_');
@@ -575,6 +620,50 @@
                     pbdRows.forEach(row => {
                         if (row.key) studentPBD[row.key] = row.value;
                     });
+                }
+
+                // Direktori guru untuk pembetulan Admin. Emel digunakan secara dalaman sahaja dan tidak dipaparkan.
+                try {
+                    const { data: teacherDirectoryData, error: teacherDirectoryError } = await supabaseClient
+                        .from('teachers')
+                        .select('name,email')
+                        .order('name', { ascending: true });
+
+                    if (!teacherDirectoryError && teacherDirectoryData) {
+                        teacherDirectoryRows = teacherDirectoryData;
+                    } else {
+                        console.warn('Jadual teachers belum tersedia atau belum boleh dibaca.', teacherDirectoryError);
+                    }
+                } catch (tdErr) {
+                    console.warn('Jadual teachers belum tersedia atau belum boleh dibaca.', tdErr);
+                }
+
+                // Data Guru Kelas rasmi. Akses Guru Kelas ditapis melalui emel, bukan nama.
+                try {
+                    const { data: classTeacherData, error: classTeacherError } = await supabaseClient
+                        .from('class_teachers')
+                        .select('*');
+
+                    if (!classTeacherError && classTeacherData) {
+                        classTeacherRows = classTeacherData;
+                    } else {
+                        console.warn('Jadual class_teachers belum tersedia atau belum boleh dibaca.', classTeacherError);
+                    }
+                } catch (ctErr) {
+                    console.warn('Jadual class_teachers belum tersedia atau belum boleh dibaca.', ctErr);
+                }
+
+                // Data pengesahan Guru Kelas. Jika jadual belum dibuat, fungsi asal sistem tidak terganggu.
+                try {
+                    const { data: verificationRows, error: verificationError } = await supabaseClient
+                        .from('semakan_guru_kelas')
+                        .select('*')
+                        .order('tarikh', { ascending: false });
+                    if (!verificationError && verificationRows) {
+                        classVerificationRows = verificationRows;
+                    }
+                } catch (vErr) {
+                    console.warn('Jadual semakan_guru_kelas belum tersedia atau belum boleh dibaca.', vErr);
                 }
             } catch (e) {
                 console.error('Error retrieving Supabase data:', e);
@@ -891,7 +980,13 @@ if (!teacherError && teacher?.name) {
            
 currentUser.name = namaGuru;
 currentUser.fullName = namaGuru;
-                
+
+// Pastikan data Guru Kelas dimuat dahulu sebelum dashboard dipaparkan.
+// Ini mengelakkan perlu refresh atau login dua kali.
+if (type === 'guru_kelas') {
+    await loadGuruKelasByEmail(email);
+}
+
                 showApp();
                 
                 showToast(`👋 Selamat datang, ${currentUser.name}!`, 'success');
@@ -912,6 +1007,13 @@ currentUser.fullName = namaGuru;
                 await supabaseClient.auth.signOut();
             }
             currentUser = null;
+            isAdmin = false;
+            classTeacherRows = [];
+            teacherDirectoryRows = [];
+            classVerificationRows = [];
+            guruKelasSelectedClass = '';
+            markStatusRows = [];
+            pbdStatusRows = [];
             document.getElementById('login-page').classList.remove('hidden');
             document.getElementById('app-container').classList.add('hidden');
             document.getElementById('email').value = '';
@@ -928,9 +1030,9 @@ currentUser.fullName = namaGuru;
             const avatar = document.getElementById('user-avatar');
             avatar.innerText = currentUser.name.charAt(0);
             
-            let avatarBg = 'bg-emerald-500';
+            let avatarBg = 'bg-blue-500';
             if (isAdmin) avatarBg = 'bg-slate-800';
-            else if (currentUser.role === 'Guru Kelas') avatarBg = 'bg-teal-600';
+            else if (currentUser.role === 'Guru Kelas') avatarBg = 'bg-purple-600';
             avatar.className = `w-10 h-10 rounded-full flex items-center justify-center text-white font-bold shadow-sm ${avatarBg}`;
 
             if (isAdmin) {
@@ -1005,10 +1107,10 @@ currentUser.fullName = namaGuru;
 
             document.querySelectorAll('.nav-btn').forEach(btn => {
                 if (btn.getAttribute('data-page') === pageId) {
-                    btn.classList.add('bg-emerald-50', 'text-emerald-700', 'font-bold');
+                    btn.classList.add('bg-blue-50', 'text-blue-700', 'font-bold');
                     btn.classList.remove('text-gray-500');
                 } else {
-                    btn.classList.remove('bg-emerald-50', 'text-emerald-700', 'font-bold');
+                    btn.classList.remove('bg-blue-50', 'text-blue-700', 'font-bold');
                     btn.classList.add('text-gray-500');
                 }
             });
@@ -1027,14 +1129,91 @@ currentUser.fullName = namaGuru;
                 overlay.classList.add('hidden');
             }
         }
+        // LETAK KOD REFRESH DI SINI
+        function cleanEmail(value) {
+            return String(value || '')
+                .toLowerCase()
+                .trim()
+                .replace('mailto:', '')
+                .replace('[', '')
+                .replace(']', '')
+                .replace('(', '')
+                .replace(')', '')
+                .replace(/\s+/g, '');
+        }
 
+        async function loadGuruKelasByEmail(emailGuru) {
+            if (!supabaseEnabled || !supabaseClient || !currentUser) return null;
+
+            const email = cleanEmail(emailGuru || currentUser.email);
+
+            // Ambil semula class_teachers jika masih kosong.
+            if (!classTeacherRows || classTeacherRows.length === 0) {
+                const { data, error } = await supabaseClient
+                    .from('class_teachers')
+                    .select('*');
+
+                if (error) {
+                    console.error('Ralat baca class_teachers:', error);
+                    return null;
+                }
+                classTeacherRows = data || [];
+            }
+
+            const row = (classTeacherRows || []).find(item => {
+                const guruEmail = cleanEmail(item.guru_kelas_email || item.guru_email);
+                const pembantuEmail = cleanEmail(item.pembantu_email);
+                return email && (guruEmail === email || pembantuEmail === email);
+            });
+
+            if (!row) {
+                console.log('Email Guru Kelas tidak dijumpai:', email);
+                console.log('Data class_teachers:', classTeacherRows);
+                guruKelasSelectedClass = '';
+                currentUser.kelas = '';
+                currentUser.guruKelas = '-';
+                currentUser.pembantuGuru = '-';
+                return null;
+            }
+
+            guruKelasSelectedClass = row.kelas;
+            currentUser.kelas = row.kelas;
+            currentUser.guruKelas = row.guru_kelas || '-';
+            currentUser.pembantuGuru = row.pembantu_guru || row.pembantu || '-';
+            currentUser.guruKelasEmail = row.guru_kelas_email || row.guru_email || '';
+            currentUser.pembantuEmail = row.pembantu_email || '';
+
+            return row;
+        }
+
+        async function refreshGuruKelasDashboard() {
+            try {
+                await fetchAllDataFromSupabase();
+
+                const { data: userData } = await supabaseClient.auth.getUser();
+                const row = await loadGuruKelasByEmail(userData?.user?.email || currentUser?.email);
+
+                if (!row) {
+                    showToast('Emel ini belum didaftarkan sebagai Guru Kelas atau Pembantu Guru Kelas.', 'warning');
+                    renderPage();
+                    return;
+                }
+
+                renderPage();
+                showToast(`Dashboard ${row.kelas} berjaya disegarkan.`, 'success');
+
+            } catch (err) {
+                console.error(err);
+                showToast('Gagal menyegarkan Dashboard Guru Kelas.', 'danger');
+            }
+        }
         // --- TOAST SYSTEMS ---
         function showToast(message, type = 'success') {
             const container = document.getElementById('toast-container');
             const toast = document.createElement('div');
             
             const bgClasses = {
-                success: 'bg-emerald-600 border-emerald-500 text-white',
+                success: 'bg-blue-600 border-blue-500 text-white',
                 danger: 'bg-rose-600 border-rose-500 text-white',
                 info: 'bg-slate-800 border-slate-700 text-white',
                 warning: 'bg-amber-500 border-amber-400 text-slate-900'
@@ -1072,7 +1251,7 @@ currentUser.fullName = namaGuru;
                 return { grade: '-', color: 'text-gray-400 bg-gray-50 border-gray-100', label: 'Belum Dinilai' };
             }
             const num = parseFloat(score);
-            if (num >= 82 && num <= 100) return { grade: 'A', color: 'text-emerald-700 bg-emerald-50 border-emerald-200', label: 'CEMERLANG' };
+            if (num >= 82 && num <= 100) return { grade: 'A', color: 'text-blue-700 bg-blue-50 border-blue-200', label: 'CEMERLANG' };
             if (num >= 66 && num <= 81) return { grade: 'B', color: 'text-cyan-700 bg-cyan-50 border-cyan-200', label: 'KEPUJIAN' };
             if (num >= 50 && num <= 65) return { grade: 'C', color: 'text-amber-700 bg-amber-50 border-amber-200', label: 'MEMUASKAN' };
             if (num >= 35 && num <= 49) return { grade: 'D', color: 'text-orange-700 bg-orange-50 border-orange-200', label: 'MENCAPAI TAHAP MINIMUM' };
@@ -1164,6 +1343,7 @@ currentUser.fullName = namaGuru;
             }
 
             await persistMarksBulkToSupabase(markRows, pbdRows);
+            await fetchAllDataFromSupabase();
 
             if (!silent) {
                 showToast(`Selesai menyimpan ${successCount} rekod prestasi ke Supabase.`, 'success');
@@ -1384,9 +1564,212 @@ currentUser.fullName = namaGuru;
         }
 
         function renderStatusBadge(status) {
-            if (status === 'SIAP') return '<span class="px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-100 text-[10px] font-black">SIAP</span>';
+            if (status === 'SIAP') return '<span class="px-2.5 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-100 text-[10px] font-black">SIAP</span>';
             if (status === 'SEBAHAGIAN') return '<span class="px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-100 text-[10px] font-black">SEBAHAGIAN</span>';
             return '<span class="px-2.5 py-1 rounded-full bg-rose-50 text-rose-700 border border-rose-100 text-[10px] font-black">BELUM MULA</span>';
+        }
+
+
+        function encodeAdminEditPayload(obj) {
+            try {
+                return btoa(unescape(encodeURIComponent(JSON.stringify(obj))));
+            } catch (e) {
+                return '';
+            }
+        }
+
+        function decodeAdminEditPayload(value) {
+            try {
+                return JSON.parse(decodeURIComponent(escape(atob(value))));
+            } catch (e) {
+                console.error('Payload pembetulan tidak sah:', e);
+                return null;
+            }
+        }
+
+        function getTeacherEmailByName(name) {
+            const target = normalizeTeacherName(name);
+            const found = (teacherDirectoryRows || []).find(t => normalizeTeacherName(t.name) === target);
+            return found ? cleanEmail(found.email) : '';
+        }
+
+        function openAdminEditFilling(payloadEncoded) {
+            if (!isAdmin) {
+                showToast('Hanya Admin boleh membuat pembetulan rekod.', 'warning');
+                return;
+            }
+
+            const payload = decodeAdminEditPayload(payloadEncoded);
+            if (!payload) {
+                showToast('Rekod tidak dapat dibaca untuk pembetulan.', 'danger');
+                return;
+            }
+
+            const teacherOptions = (teacherDirectoryRows && teacherDirectoryRows.length > 0 ? teacherDirectoryRows.map(t => t.name).filter(Boolean) : teachers)
+                .filter((v, i, arr) => arr.indexOf(v) === i)
+                .sort((a, b) => String(a).localeCompare(String(b)))
+                .map(name => `<option value="${String(name).replace(/"/g, '&quot;')}" ${name === payload.teacher_name ? 'selected' : ''}>${name}</option>`)
+                .join('');
+
+            const modal = document.getElementById('admin-edit-filling-modal');
+            modal.innerHTML = `
+                <div class="bg-white rounded-3xl max-w-2xl w-full p-6 shadow-2xl border border-slate-100 space-y-5">
+                    <div class="flex items-start justify-between gap-4">
+                        <div>
+                            <h3 class="font-black text-slate-800 text-lg flex items-center gap-2">
+                                <i data-lucide="edit-3" class="w-5 h-5 text-purple-600"></i>
+                                Edit / Update Pengisian Guru
+                            </h3>
+                            <p class="text-xs text-slate-500 font-semibold mt-1">Pembetulan ini akan mengemas kini rekod marks dan pbd yang sepadan. Markah murid tidak dipadam.</p>
+                        </div>
+                        <button onclick="closeAdminEditFillingModal()" class="p-2 rounded-xl hover:bg-slate-100 text-slate-400">
+                            <i data-lucide="x" class="w-5 h-5"></i>
+                        </button>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div class="space-y-1">
+                            <label class="text-[10px] font-black text-slate-400 uppercase">Nama Guru Betul</label>
+                            <select id="admin-edit-teacher" class="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-purple-500">
+                                ${teacherOptions}
+                            </select>
+                        </div>
+                        <div class="space-y-1">
+                            <label class="text-[10px] font-black text-slate-400 uppercase">Kelas Betul</label>
+                            <select id="admin-edit-class" class="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-purple-500">
+                                ${classes.map(c => `<option value="${c}" ${c === payload.kelas ? 'selected' : ''}>${c}</option>`).join('')}
+                            </select>
+                        </div>
+                        <div class="space-y-1">
+                            <label class="text-[10px] font-black text-slate-400 uppercase">Subjek Betul</label>
+                            <select id="admin-edit-subject" class="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-purple-500">
+                                ${baseSubjects.map(s => `<option value="${s}" ${s === payload.subject ? 'selected' : ''}>${s}</option>`).join('')}
+                            </select>
+                        </div>
+                        <div class="space-y-1">
+                            <label class="text-[10px] font-black text-slate-400 uppercase">Pentaksiran Betul</label>
+                            <select id="admin-edit-assessment" class="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-purple-500">
+                                ${assessments.map(a => `<option value="${a}" ${a === payload.assessment ? 'selected' : ''}>${a}</option>`).join('')}
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="bg-amber-50 border border-amber-100 text-amber-800 rounded-2xl p-4 text-xs font-semibold leading-relaxed">
+                        Rekod asal: <b>${payload.teacher_name}</b> | <b>${payload.kelas}</b> | <b>${payload.subject}</b> | <b>${payload.assessment}</b><br>
+                        Selepas update, rekod akan keluar daripada guru/subjek yang salah dan masuk ke guru/subjek yang betul.
+                    </div>
+
+                    <div class="flex justify-end gap-2 pt-2">
+                        <button onclick="closeAdminEditFillingModal()" class="px-4 py-2 text-xs font-bold text-slate-500 bg-slate-100 hover:bg-slate-200 rounded-xl">Batal</button>
+                        <button onclick="updateAdminFillingCorrection('${payloadEncoded}')" class="px-5 py-2 text-xs font-black text-white bg-purple-600 hover:bg-purple-700 rounded-xl shadow-md flex items-center gap-1.5">
+                            <i data-lucide="save" class="w-4 h-4"></i> Simpan Update
+                        </button>
+                    </div>
+                </div>
+            `;
+            modal.classList.remove('hidden');
+            lucide.createIcons();
+        }
+
+        function closeAdminEditFillingModal() {
+            const modal = document.getElementById('admin-edit-filling-modal');
+            if (modal) {
+                modal.classList.add('hidden');
+                modal.innerHTML = '';
+            }
+        }
+
+        async function updateRowsForTable(tableName, oldPayload, newPayload) {
+            const oldEmail = cleanEmail(oldPayload.teacher_email);
+            let query = supabaseClient
+                .from(tableName)
+                .select('student_id,tahun,assessment,subject,kelas,teacher_email,teacher_name')
+                .eq('tahun', String(oldPayload.tahun))
+                .eq('assessment', oldPayload.assessment)
+                .eq('subject', oldPayload.subject)
+                .eq('kelas', oldPayload.kelas);
+
+            if (oldEmail && oldEmail !== '-') {
+                query = query.eq('teacher_email', oldEmail);
+            } else {
+                query = query.eq('teacher_name', oldPayload.teacher_name);
+            }
+
+            const { data: rows, error: selectError } = await query;
+            if (selectError) throw selectError;
+            if (!rows || rows.length === 0) return 0;
+
+            let updatedCount = 0;
+            for (const row of rows) {
+                const newKey = `${row.student_id}_${newPayload.tahun}_${newPayload.assessment}_${newPayload.subject}`;
+                let updateQuery = supabaseClient
+                    .from(tableName)
+                    .update({
+                        key: newKey,
+                        tahun: String(newPayload.tahun),
+                        assessment: newPayload.assessment,
+                        subject: newPayload.subject,
+                        kelas: newPayload.kelas,
+                        teacher_name: newPayload.teacher_name,
+                        teacher_email: newPayload.teacher_email || oldPayload.teacher_email || null,
+                        updated_at: new Date().toISOString()
+                    })
+                    .eq('student_id', String(row.student_id))
+                    .eq('tahun', String(oldPayload.tahun))
+                    .eq('assessment', oldPayload.assessment)
+                    .eq('subject', oldPayload.subject)
+                    .eq('kelas', oldPayload.kelas);
+
+                const rowEmail = cleanEmail(row.teacher_email || oldPayload.teacher_email);
+                if (rowEmail && rowEmail !== '-') {
+                    updateQuery = updateQuery.eq('teacher_email', rowEmail);
+                } else {
+                    updateQuery = updateQuery.eq('teacher_name', oldPayload.teacher_name);
+                }
+
+                const { error: updateError } = await updateQuery;
+                if (updateError) throw updateError;
+                updatedCount++;
+            }
+            return updatedCount;
+        }
+
+        async function updateAdminFillingCorrection(payloadEncoded) {
+            if (!isAdmin || !supabaseEnabled || !supabaseClient) {
+                showToast('Akses Admin atau Supabase tidak tersedia.', 'danger');
+                return;
+            }
+
+            const oldPayload = decodeAdminEditPayload(payloadEncoded);
+            if (!oldPayload) return;
+
+            const newTeacherName = document.getElementById('admin-edit-teacher').value;
+            const newClass = document.getElementById('admin-edit-class').value;
+            const newSubject = document.getElementById('admin-edit-subject').value;
+            const newAssessment = document.getElementById('admin-edit-assessment').value;
+            const newTeacherEmail = getTeacherEmailByName(newTeacherName) || cleanEmail(oldPayload.teacher_email);
+
+            const newPayload = {
+                tahun: oldPayload.tahun,
+                assessment: newAssessment,
+                subject: newSubject,
+                kelas: newClass,
+                teacher_name: newTeacherName,
+                teacher_email: newTeacherEmail
+            };
+
+            try {
+                const markCount = await updateRowsForTable('marks', oldPayload, newPayload);
+                const pbdCount = await updateRowsForTable('pbd', oldPayload, newPayload);
+
+                closeAdminEditFillingModal();
+                await fetchAllDataFromSupabase();
+                renderPage();
+                showToast(`Update berjaya. Marks: ${markCount} rekod, PBD: ${pbdCount} rekod.`, 'success');
+            } catch (e) {
+                console.error('Gagal update pembetulan Admin:', e);
+                showToast('Gagal update rekod. Semak RLS, column key, atau struktur table marks/pbd.', 'danger');
+            }
         }
 
         function renderFillingStatusPanel(scope = 'admin', classFilter = null) {
@@ -1397,11 +1780,11 @@ currentUser.fullName = namaGuru;
             const overallPercent = totalTasks > 0 ? Math.round((doneTasks / totalTasks) * 100) : 0;
 
             return `
-                <div class="bg-white rounded-2xl border border-emerald-100 shadow-sm overflow-hidden">
-                    <div class="p-5 border-b border-emerald-50 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                <div class="bg-white rounded-2xl border border-blue-100 shadow-sm overflow-hidden">
+                    <div class="p-5 border-b border-blue-50 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
                         <div>
                             <h3 class="font-black text-slate-800 text-sm flex items-center gap-2">
-                                <i data-lucide="clipboard-check" class="w-5 h-5 text-emerald-600"></i>
+                                <i data-lucide="clipboard-check" class="w-5 h-5 text-blue-600"></i>
                                 Semakan Pengisian Guru
                             </h3>
                             <p class="text-[11px] text-slate-400 font-semibold mt-1">Paparan status berdasarkan data markah yang telah dihantar ke Supabase.</p>
@@ -1413,7 +1796,7 @@ currentUser.fullName = namaGuru;
                             <select onchange="selectedAssessment=this.value; renderPage()" class="p-2 border border-slate-200 rounded-xl text-xs font-bold outline-none">
                                 ${assessments.map(a => `<option value="${a}" ${selectedAssessment===a?'selected':''}>${a}</option>`).join('')}
                             </select>
-                            <button onclick="fetchAllDataFromSupabase().then(()=>{showToast('Status telah disegerakkan.', 'success'); renderPage();})" class="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5">
+                            <button onclick="fetchAllDataFromSupabase().then(()=>{showToast('Status telah disegerakkan.', 'success'); renderPage();})" class="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5">
                                 <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i> Segar
                             </button>
                         </div>
@@ -1426,7 +1809,7 @@ currentUser.fullName = namaGuru;
                         </div>
                         <div class="bg-white p-4 rounded-2xl border border-slate-100">
                             <p class="text-[10px] font-bold text-slate-400 uppercase">Siap</p>
-                            <h4 class="text-xl font-black text-emerald-700">${doneTasks}</h4>
+                            <h4 class="text-xl font-black text-blue-700">${doneTasks}</h4>
                         </div>
                         <div class="bg-white p-4 rounded-2xl border border-slate-100">
                             <p class="text-[10px] font-bold text-slate-400 uppercase">Sebahagian</p>
@@ -1434,7 +1817,7 @@ currentUser.fullName = namaGuru;
                         </div>
                         <div class="bg-white p-4 rounded-2xl border border-slate-100">
                             <p class="text-[10px] font-bold text-slate-400 uppercase">Peratus Siap</p>
-                            <h4 class="text-xl font-black text-teal-700">${overallPercent}%</h4>
+                            <h4 class="text-xl font-black text-purple-700">${overallPercent}%</h4>
                         </div>
                     </div>
 
@@ -1450,21 +1833,27 @@ currentUser.fullName = namaGuru;
                                     <th class="p-4 text-center">%</th>
                                     <th class="p-4">Kemaskini</th>
                                     <th class="p-4 text-center">Status</th>
+                                    <th class="p-4 text-center no-print">Tindakan</th>
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-slate-50">
                                 ${rows.length === 0 ? `
-                                    <tr><td colspan="8" class="p-6 text-center text-slate-400 font-bold">Belum ada data pengisian untuk pilihan ini.</td></tr>
+                                    <tr><td colspan="9" class="p-6 text-center text-slate-400 font-bold">Belum ada data pengisian untuk pilihan ini.</td></tr>
                                 ` : rows.map(r => `
                                     <tr class="hover:bg-slate-50/60">
                                         <td class="p-4 font-bold text-slate-800">${r.teacher_name}</td>
-                                        <td class="p-4"><span class="bg-emerald-50 text-emerald-700 text-[10px] px-2.5 py-1 rounded-full font-black">${r.kelas}</span></td>
+                                        <td class="p-4"><span class="bg-blue-50 text-blue-700 text-[10px] px-2.5 py-1 rounded-full font-black">${r.kelas}</span></td>
                                         <td class="p-4 font-semibold text-slate-600">${r.subject}</td>
                                         <td class="p-4 text-slate-500 font-semibold">${r.assessment}</td>
                                         <td class="p-4 text-center font-black text-slate-700">${r.completed}/${r.total}</td>
                                         <td class="p-4 text-center font-black text-slate-700">${r.percent}%</td>
                                         <td class="p-4 text-slate-500 font-semibold">${formatDateTimeMY(r.updated_at)}</td>
                                         <td class="p-4 text-center">${renderStatusBadge(r.status)}</td>
+                                        <td class="p-4 text-center no-print">
+                                            <button onclick="openAdminEditFilling('${encodeAdminEditPayload(r)}')" class="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-[10px] font-black inline-flex items-center gap-1">
+                                                <i data-lucide="edit-3" class="w-3.5 h-3.5"></i> Edit / Update
+                                            </button>
+                                        </td>
                                     </tr>
                                 `).join('')}
                             </tbody>
@@ -1612,7 +2001,7 @@ currentUser.fullName = namaGuru;
         function renderSlipPentaksiranPage() {
             const student = getSlipStudent();
             if (!student) {
-                return `<div class="bg-white p-6 rounded-2xl border border-emerald-100 text-center text-sm font-bold text-slate-500">Tiada data murid. Sila import data murid terlebih dahulu.</div>`;
+                return `<div class="bg-white p-6 rounded-2xl border border-blue-100 text-center text-sm font-bold text-slate-500">Tiada data murid. Sila import data murid terlebih dahulu.</div>`;
             }
 
             const subjectsForSlip = getSlipSubjectsForStudent(student);
@@ -1633,7 +2022,7 @@ currentUser.fullName = namaGuru;
 
             return `
                 <div class="slip-admin-panel space-y-5">
-                    <div class="slip-control-panel bg-white p-5 rounded-2xl border border-emerald-100 shadow-sm no-print">
+                    <div class="slip-control-panel bg-white p-5 rounded-2xl border border-blue-100 shadow-sm no-print">
                         <div class="flex flex-col lg:flex-row lg:items-end gap-3">
                             <div class="flex-1">
                                 <label class="text-[10px] font-black text-slate-400 uppercase">Pilih Murid</label>
@@ -1742,9 +2131,591 @@ currentUser.fullName = namaGuru;
             `;
         }
 
+
+        // --- DASHBOARD GURU: SEMAKAN PENGISIAN SENDIRI ---
+        function normalizeName(value) {
+            return String(value || '').trim().toUpperCase();
+        }
+
+        function getTeacherOwnStatusRows() {
+            const guruName = normalizeName(currentUser?.name);
+            const guruEmail = String(currentUser?.email || '').trim().toLowerCase();
+            const grouped = {};
+
+            function shouldInclude(row) {
+                if (!row) return false;
+                const rowEmail = String(row.teacher_email || '').trim().toLowerCase();
+                const rowTeacher = normalizeName(row.teacher_name);
+                if (guruEmail && rowEmail === guruEmail) return true;
+                if (guruName && rowTeacher === guruName) return true;
+                return false;
+            }
+
+            function ensureGroup(row) {
+                const tahunName = row.tahun || selectedYear;
+                const assessmentName = row.assessment || selectedAssessment;
+                const kelasName = row.kelas || '-';
+                const subjectName = row.subject || '-';
+                const teacherName = row.teacher_name || currentUser?.name || '-';
+                const key = [tahunName, assessmentName, kelasName, subjectName].join('||');
+
+                if (!grouped[key]) {
+                    grouped[key] = {
+                        tahun: tahunName,
+                        assessment: assessmentName,
+                        kelas: kelasName,
+                        subject: subjectName,
+                        teacher_name: teacherName,
+                        teacher_email: row.teacher_email || currentUser?.email || '-',
+                        markIds: new Set(),
+                        pbdIds: new Set(),
+                        updated_at: row.updated_at || null
+                    };
+                }
+
+                if (row.updated_at && (!grouped[key].updated_at || new Date(row.updated_at) > new Date(grouped[key].updated_at))) {
+                    grouped[key].updated_at = row.updated_at;
+                }
+
+                return grouped[key];
+            }
+
+            (markStatusRows || []).filter(shouldInclude).forEach(row => {
+                const g = ensureGroup(row);
+                if (row.student_id && row.value !== null && row.value !== undefined && row.value !== '') {
+                    g.markIds.add(String(row.student_id));
+                }
+            });
+
+            (pbdStatusRows || []).filter(shouldInclude).forEach(row => {
+                const g = ensureGroup(row);
+                if (row.student_id && row.value !== null && row.value !== undefined && row.value !== '') {
+                    g.pbdIds.add(String(row.student_id));
+                }
+            });
+
+            return Object.values(grouped).map(item => {
+                const total = getClassStudentCount(item.kelas);
+                const markCompleted = item.markIds.size;
+                const pbdCompleted = item.pbdIds.size;
+                const completeBoth = Math.min(markCompleted, pbdCompleted);
+                const percent = total > 0 ? Math.round((completeBoth / total) * 100) : 0;
+                let status = 'BELUM MULA';
+                if (completeBoth > 0 && completeBoth < total) status = 'SEBAHAGIAN';
+                if (total > 0 && markCompleted >= total && pbdCompleted >= total) status = 'SIAP';
+                return { ...item, total, markCompleted, pbdCompleted, completeBoth, percent, status };
+            }).sort((a, b) => {
+                return (a.kelas + a.subject + a.assessment).localeCompare(b.kelas + b.subject + b.assessment);
+            });
+        }
+
+        function editTeacherFilling(tahun, assessment, kelas, subject, teacherName) {
+            selectedYear = tahun;
+            selectedAssessment = assessment;
+            selectedClass = kelas;
+            selectedSubject = subject;
+            selectedTeacher = teacherName || currentUser?.name || selectedTeacher;
+            isEditMode = true;
+            navigate('pengisian_markah');
+        }
+
+        function exportTeacherStatusCSV() {
+            const rows = getTeacherOwnStatusRows();
+            const csvRows = [
+                ['Nama Guru','Tahun','Pentaksiran','Kelas','Mata Pelajaran','Markah Diisi','PBD Diisi','Jumlah Murid','Peratus','Status','Kemaskini Terakhir']
+            ];
+            rows.forEach(r => {
+                csvRows.push([
+                    currentUser?.name || '', r.tahun, r.assessment, r.kelas, r.subject,
+                    r.markCompleted, r.pbdCompleted, r.total, r.percent + '%', r.status, formatDateTimeMY(r.updated_at)
+                ]);
+            });
+            const csv = csvRows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')).join('\n');
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `Status_Pengisian_${(currentUser?.name || 'Guru').replace(/\s+/g,'_')}.csv`;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        function exportTeacherStatusExcel() {
+            try {
+                const rows = getTeacherOwnStatusRows();
+                const wsData = [
+                    ['Nama Guru','Tahun','Pentaksiran','Kelas','Mata Pelajaran','Markah Diisi','PBD Diisi','Jumlah Murid','Peratus','Status','Kemaskini Terakhir']
+                ];
+                rows.forEach(r => {
+                    wsData.push([
+                        currentUser?.name || '', r.tahun, r.assessment, r.kelas, r.subject,
+                        r.markCompleted, r.pbdCompleted, r.total, r.percent + '%', r.status, formatDateTimeMY(r.updated_at)
+                    ]);
+                });
+                const wb = XLSX.utils.book_new();
+                const ws = XLSX.utils.aoa_to_sheet(wsData);
+                XLSX.utils.book_append_sheet(wb, ws, 'Status Guru');
+                XLSX.writeFile(wb, `Status_Pengisian_${(currentUser?.name || 'Guru').replace(/\s+/g,'_')}.xlsx`);
+                showToast('Status pengisian guru berjaya dieksport ke Excel.', 'success');
+            } catch (e) {
+                console.error('Gagal eksport Excel status guru:', e);
+                showToast('Ralat eksport Excel status guru.', 'danger');
+            }
+        }
+
+        function printTeacherStatusA4() {
+            const rows = getTeacherOwnStatusRows();
+            const tableRows = rows.length === 0 ? `
+                <tr><td colspan="10" style="text-align:center;padding:12px;">Belum ada rekod pengisian.</td></tr>
+            ` : rows.map((r, i) => `
+                <tr>
+                    <td>${i + 1}</td>
+                    <td>${r.tahun}</td>
+                    <td>${r.assessment}</td>
+                    <td>${r.kelas}</td>
+                    <td>${r.subject}</td>
+                    <td>${r.markCompleted}/${r.total}</td>
+                    <td>${r.pbdCompleted}/${r.total}</td>
+                    <td>${r.percent}%</td>
+                    <td>${r.status}</td>
+                    <td>${formatDateTimeMY(r.updated_at)}</td>
+                </tr>
+            `).join('');
+
+            const win = window.open('', '_blank');
+            win.document.write(`
+                <!DOCTYPE html>
+                <html lang="ms">
+                <head>
+                    <meta charset="UTF-8">
+                    <title>Status Pengisian Guru</title>
+                    <style>
+                        @page { size: A4 portrait; margin: 14mm; }
+                        body { font-family: Arial, Helvetica, sans-serif; color: #000; font-size: 11px; }
+                        h1, h2, p { margin: 0; text-align: center; }
+                        h1 { font-size: 15px; font-weight: 700; }
+                        h2 { font-size: 13px; margin-top: 4px; }
+                        .meta { margin: 14px 0; display: grid; grid-template-columns: 1fr 1fr; gap: 6px 20px; font-size: 11px; }
+                        table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+                        th, td { border: 1px solid #000; padding: 5px; text-align: center; }
+                        th { font-weight: 700; }
+                        td:nth-child(5), th:nth-child(5) { text-align: left; }
+                        .footer { margin-top: 18px; font-size: 10px; text-align: right; }
+                        .no-print { margin: 12px 0; text-align: right; }
+                        button { padding: 8px 12px; font-weight: bold; }
+                        @media print { .no-print { display: none; } }
+                    </style>
+                </head>
+                <body>
+                    <div class="no-print"><button onclick="window.print()">Cetak / Simpan PDF</button></div>
+                    <h1>SEKOLAH KEBANGSAAN BUKIT TONGKAT</h1>
+                    <p>JALAN MAWAR FELDA ULU BELITONG, 86000 KLUANG, JOHOR</p>
+                    <h2>STATUS PENGISIAN MARKAH DAN PBD GURU</h2>
+                    <div class="meta">
+                        <div><strong>Nama Guru:</strong> ${currentUser?.name || '-'}</div>
+                        <div><strong>Emel:</strong> ${currentUser?.email || '-'}</div>
+                        <div><strong>Tarikh Cetak:</strong> ${new Date().toLocaleDateString('ms-MY')}</div>
+                        <div><strong>Jumlah Rekod:</strong> ${rows.length}</div>
+                    </div>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Bil</th><th>Tahun</th><th>Pentaksiran</th><th>Kelas</th><th>Mata Pelajaran</th>
+                                <th>Markah</th><th>PBD</th><th>%</th><th>Status</th><th>Kemaskini</th>
+                            </tr>
+                        </thead>
+                        <tbody>${tableRows}</tbody>
+                    </table>
+                    <div class="footer">Dicetak melalui Sistem SISMAR SK Bukit Tongkat</div>
+                </body>
+                </html>
+            `);
+            win.document.close();
+            win.focus();
+        }
+
+        function renderTeacherOwnStatusPanel() {
+            const rows = getTeacherOwnStatusRows();
+            const siap = rows.filter(r => r.status === 'SIAP').length;
+            const sebahagian = rows.filter(r => r.status === 'SEBAHAGIAN').length;
+            const belum = rows.filter(r => r.status === 'BELUM MULA').length;
+            const jumlahMurid = rows.reduce((sum, r) => sum + r.completeBoth, 0);
+
+            return `
+                <div class="bg-white rounded-2xl border border-indigo-100 shadow-sm overflow-hidden">
+                    <div class="p-5 border-b border-indigo-50 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
+                        <div>
+                            <h3 class="font-black text-slate-800 text-base flex items-center gap-2">
+                                <i data-lucide="user-check" class="w-5 h-5 text-indigo-600"></i>
+                                Status Pengisian Saya
+                            </h3>
+                            <p class="text-[11px] text-slate-500 font-semibold mt-1">
+                                Paparan ini hanya menunjukkan rekod milik ${currentUser?.name || 'guru ini'} berdasarkan emel login dan nama guru.
+                            </p>
+                        </div>
+                        <div class="flex flex-wrap items-center gap-2 no-print">
+                            <button onclick="fetchAllDataFromSupabase().then(()=>{showToast('Status guru telah disegerakkan.', 'success'); renderPage();})" class="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5">
+                                <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i> Segar
+                            </button>
+                            <button onclick="exportTeacherStatusCSV()" class="px-3 py-2 bg-cyan-600 hover:bg-cyan-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5">
+                                <i data-lucide="file-text" class="w-3.5 h-3.5"></i> CSV
+                            </button>
+                            <button onclick="exportTeacherStatusExcel()" class="px-3 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs font-bold flex items-center gap-1.5">
+                                <i data-lucide="file-spreadsheet" class="w-3.5 h-3.5"></i> Excel
+                            </button>
+                            <button onclick="printTeacherStatusA4()" class="px-3 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-xs font-bold flex items-center gap-1.5">
+                                <i data-lucide="printer" class="w-3.5 h-3.5"></i> Print A4
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-3 p-5 bg-indigo-50/30 border-b border-slate-100">
+                        <div class="bg-white p-4 rounded-2xl border border-slate-100"><p class="text-[10px] font-bold text-slate-400 uppercase">Rekod Subjek</p><h4 class="text-xl font-black text-slate-800">${rows.length}</h4></div>
+                        <div class="bg-white p-4 rounded-2xl border border-slate-100"><p class="text-[10px] font-bold text-slate-400 uppercase">Siap</p><h4 class="text-xl font-black text-blue-700">${siap}</h4></div>
+                        <div class="bg-white p-4 rounded-2xl border border-slate-100"><p class="text-[10px] font-bold text-slate-400 uppercase">Sebahagian</p><h4 class="text-xl font-black text-amber-700">${sebahagian}</h4></div>
+                        <div class="bg-white p-4 rounded-2xl border border-slate-100"><p class="text-[10px] font-bold text-slate-400 uppercase">Murid Lengkap</p><h4 class="text-xl font-black text-purple-700">${jumlahMurid}</h4></div>
+                    </div>
+
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse text-xs">
+                            <thead>
+                                <tr class="bg-white border-b border-slate-100 text-[10px] font-black text-slate-400 uppercase tracking-wider">
+                                    <th class="p-4">Guru</th>
+                                    <th class="p-4">Kelas</th>
+                                    <th class="p-4">Subjek</th>
+                                    <th class="p-4">Pentaksiran</th>
+                                    <th class="p-4 text-center">Markah</th>
+                                    <th class="p-4 text-center">PBD</th>
+                                    <th class="p-4 text-center">%</th>
+                                    <th class="p-4">Kemaskini</th>
+                                    <th class="p-4 text-center">Status</th>
+                                    <th class="p-4 text-center no-print">Tindakan</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-50">
+                                ${rows.length === 0 ? `
+                                    <tr><td colspan="10" class="p-6 text-center text-slate-400 font-bold">Belum ada rekod pengisian untuk guru ini.</td></tr>
+                                ` : rows.map(r => `
+                                    <tr class="hover:bg-slate-50/60">
+                                        <td class="p-4 font-bold text-slate-800">${currentUser?.name || r.teacher_name}</td>
+                                        <td class="p-4"><span class="bg-indigo-50 text-indigo-700 text-[10px] px-2.5 py-1 rounded-full font-black">${r.kelas}</span></td>
+                                        <td class="p-4 font-semibold text-slate-600">${r.subject}</td>
+                                        <td class="p-4 text-slate-500 font-semibold">${r.assessment}</td>
+                                        <td class="p-4 text-center font-black text-slate-700">${r.markCompleted}/${r.total}</td>
+                                        <td class="p-4 text-center font-black text-slate-700">${r.pbdCompleted}/${r.total}</td>
+                                        <td class="p-4 text-center font-black text-slate-700">${r.percent}%</td>
+                                        <td class="p-4 text-slate-500 font-semibold">${formatDateTimeMY(r.updated_at)}</td>
+                                        <td class="p-4 text-center">${renderStatusBadge(r.status)}</td>
+                                        <td class="p-4 text-center no-print">
+                                            <button onclick="editTeacherFilling('${r.tahun}','${r.assessment.replace(/'/g, "\\'")}','${r.kelas.replace(/'/g, "\\'")}','${r.subject.replace(/'/g, "\\'")}','${String(r.teacher_name || '').replace(/'/g, "\\'")}')" class="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-[10px] font-bold">
+                                                Edit / Lihat Murid
+                                            </button>
+                                        </td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            `;
+        }
+
+
+        // --- ALIRAN RASMI GURU KELAS ---
+        function normalizeEmail(value) {
+            return cleanEmail(value);
+        }
+
+        function getAllowedGuruKelasClasses() {
+            const currentEmail = normalizeEmail(currentUser?.email || '');
+
+            // Jika kelas telah dimuat melalui login/refresh, kunci terus kepada kelas itu sahaja.
+            if (currentUser?.kelas) {
+                return [{
+                    kelas: currentUser.kelas,
+                    tahun: String(currentUser.kelas || '').charAt(0),
+                    guru_kelas: currentUser.guruKelas || '-',
+                    pembantu: currentUser.pembantuGuru || '-'
+                }];
+            }
+
+            // Keutamaan: padanan emel daripada jadual Supabase class_teachers.
+            // Emel tidak dipaparkan dalam dashboard. Ia hanya digunakan untuk kawalan akses.
+            const rowsFromSupabase = (classTeacherRows || []).filter(item => {
+                const guruEmail = normalizeEmail(item.guru_email || item.guru_kelas_email);
+                const pembantuEmail = normalizeEmail(item.pembantu_email);
+                return currentEmail && (guruEmail === currentEmail || pembantuEmail === currentEmail);
+            }).map(item => ({
+                kelas: item.kelas,
+                tahun: item.tahun,
+                guru_kelas: item.guru_kelas,
+                pembantu: item.pembantu || item.pembantu_guru || '-'
+            }));
+
+            if (rowsFromSupabase.length > 0) {
+                return rowsFromSupabase;
+            }
+
+            return [];
+        }
+
+        function getVerificationForClass(kelasName, jenis) {
+            return (classVerificationRows || []).find(row =>
+                row.kelas === kelasName &&
+                String(row.tahun) === String(selectedYear) &&
+                row.assessment === selectedAssessment &&
+                row.jenis === jenis
+            );
+        }
+
+        function getClassCompletionSummary(kelasName) {
+            const classStudents = students.filter(s => s.kelas === kelasName);
+            const totalStudents = classStudents.length;
+            const subjectList = getSubjectsForClass(kelasName);
+            let completedSubjects = 0;
+            let partialSubjects = 0;
+            let totalFilled = 0;
+
+            subjectList.forEach(sub => {
+                const filled = new Set((markStatusRows || []).filter(row =>
+                    row.kelas === kelasName &&
+                    row.subject === sub &&
+                    row.assessment === selectedAssessment &&
+                    String(row.tahun) === String(selectedYear)
+                ).map(row => String(row.student_id))).size;
+
+                totalFilled += filled;
+                if (totalStudents > 0 && filled >= totalStudents) completedSubjects++;
+                else if (filled > 0) partialSubjects++;
+            });
+
+            const totalRequired = totalStudents * subjectList.length;
+            const percent = totalRequired > 0 ? Math.round((totalFilled / totalRequired) * 100) : 0;
+            return { totalStudents, subjectCount: subjectList.length, completedSubjects, partialSubjects, totalFilled, totalRequired, percent };
+        }
+
+        function getSubjectsForClass(kelasName) {
+            const yearLevel = parseInt(String(kelasName || '').charAt(0), 10) || 1;
+            const tahap1 = ['BAHASA MELAYU', 'BAHASA INGGERIS', 'MATEMATIK', 'SAINS', 'PENDIDIKAN ISLAM', 'BAHASA ARAB', 'PENDIDIKAN SENI VISUAL', 'PENDIDIKAN JASMANI DAN KESIHATAN', 'MUZIK'];
+            const tahap2 = [...tahap1, 'SEJARAH', 'REKA BENTUK TEKNOLOGI'];
+            return yearLevel <= 3 ? tahap1 : tahap2;
+        }
+
+        async function submitClassVerification(jenis) {
+            if (!supabaseEnabled || !supabaseClient) {
+                showToast('Supabase belum disambungkan.', 'danger');
+                return;
+            }
+            if (!guruKelasSelectedClass) {
+                showToast('Sila pilih kelas terlebih dahulu.', 'warning');
+                return;
+            }
+
+            const payload = {
+                kelas: guruKelasSelectedClass,
+                tahun: String(selectedYear),
+                assessment: selectedAssessment,
+                jenis,
+                guru_kelas: currentUser?.name || 'Guru Kelas',
+                guru_email: currentUser?.email || null,
+                status: 'Menunggu Semakan Admin',
+                tarikh: new Date().toISOString()
+            };
+
+            try {
+                const { data: existingRows, error: findError } = await supabaseClient
+                    .from('semakan_guru_kelas')
+                    .select('id')
+                    .eq('kelas', payload.kelas)
+                    .eq('tahun', payload.tahun)
+                    .eq('assessment', payload.assessment)
+                    .eq('jenis', payload.jenis)
+                    .limit(1);
+
+                if (findError) throw findError;
+
+                if (existingRows && existingRows.length > 0) {
+                    const { error: updateError } = await supabaseClient
+                        .from('semakan_guru_kelas')
+                        .update(payload)
+                        .eq('id', existingRows[0].id);
+                    if (updateError) throw updateError;
+                } else {
+                    const { error: insertError } = await supabaseClient
+                        .from('semakan_guru_kelas')
+                        .insert(payload);
+                    if (insertError) throw insertError;
+                }
+
+                await fetchAllDataFromSupabase();
+                showToast(`${jenis} ${guruKelasSelectedClass} telah dihantar ke Dashboard Admin.`, 'success');
+                renderPage();
+            } catch (e) {
+                console.error('Gagal hantar pengesahan guru kelas:', e);
+                showToast('Gagal hantar pengesahan. Pastikan jadual semakan_guru_kelas dan RLS betul.', 'danger');
+            }
+        }
+
+        function renderVerificationStatus(status) {
+            if (status === 'Disahkan Admin') return '<span class="px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-100 text-[10px] font-black">DISAHKAN ADMIN</span>';
+            if (status === 'Perlu Pembetulan') return '<span class="px-2.5 py-1 rounded-full bg-rose-50 text-rose-700 border border-rose-100 text-[10px] font-black">PERLU PEMBETULAN</span>';
+            return '<span class="px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-100 text-[10px] font-black">MENUNGGU SEMAKAN ADMIN</span>';
+        }
+
+        function renderGuruKelasOfficialFlow(kelasName) {
+            const assignment = getAllowedGuruKelasClasses().find(x => x.kelas === kelasName) || classTeacherAssignments.find(x => x.kelas === kelasName) || {};
+            const summary = getClassCompletionSummary(kelasName);
+            const markahVerification = getVerificationForClass(kelasName, 'MARKAH');
+            const pbdVerification = getVerificationForClass(kelasName, 'PBD');
+
+            return `
+                <div class="bg-white rounded-2xl border border-purple-100 shadow-sm overflow-hidden">
+                    <div class="p-5 border-b border-purple-100 bg-gradient-to-r from-purple-50 to-blue-50 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                        <div>
+                            <h3 class="font-black text-slate-800 text-sm flex items-center gap-2">
+                                <i data-lucide="workflow" class="w-5 h-5 text-purple-600"></i>
+                                Aliran Rasmi Semakan Guru Kelas
+                            </h3>
+                            <p class="text-[11px] text-slate-500 font-semibold mt-1">Guru Kelas dan Pembantu Guru Kelas sahaja boleh mengesahkan kelas ini.</p>
+                        </div>
+                        <div class="no-print flex flex-wrap items-center gap-2">
+                            <select onchange="guruKelasSelectedClass=this.value; renderPage()" class="p-2 border border-purple-100 rounded-xl text-xs font-bold outline-none bg-white">
+                                ${getAllowedGuruKelasClasses().map(a => `<option value="${a.kelas}" ${guruKelasSelectedClass===a.kelas?'selected':''}>${a.kelas}</option>`).join('')}
+                            </select>
+           <button onclick="refreshGuruKelasDashboard()"
+            class="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5">
+            <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i> Segar
+            </button>
+                        </div>
+                    </div>
+
+                    <div class="p-5 grid grid-cols-1 md:grid-cols-3 gap-4 border-b border-slate-100">
+                        <div class="bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                            <p class="text-[10px] font-black text-slate-400 uppercase">Kelas</p>
+                            <h4 class="text-xl font-black text-slate-800">${kelasName}</h4>
+                            <p class="text-[11px] text-slate-500 font-semibold mt-1">${summary.totalStudents} murid</p>
+                        </div>
+                        <div class="bg-blue-50 p-4 rounded-2xl border border-blue-100">
+                            <p class="text-[10px] font-black text-blue-400 uppercase">Guru Kelas</p>
+                            <h4 class="text-sm font-black text-blue-900 leading-snug">${assignment.guru_kelas || '-'}</h4>
+                            <p class="text-[11px] text-blue-600 font-semibold mt-1">Pembantu: ${assignment.pembantu || '-'}</p>
+                        </div>
+                        <div class="bg-purple-50 p-4 rounded-2xl border border-purple-100">
+                            <p class="text-[10px] font-black text-purple-400 uppercase">Kemajuan Lengkap</p>
+                            <h4 class="text-xl font-black text-purple-800">${summary.percent}%</h4>
+                            <div class="mt-2 h-2 bg-white rounded-full overflow-hidden border border-purple-100">
+                                <div class="h-full bg-purple-600" style="width:${summary.percent}%"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="p-5 grid grid-cols-1 lg:grid-cols-2 gap-4">
+                        <div class="border border-slate-100 rounded-2xl p-4 space-y-3">
+                            <div class="flex items-center justify-between gap-3">
+                                <div>
+                                    <h4 class="font-black text-slate-800 text-sm">Pengesahan Pentaksiran</h4>
+                                    <p class="text-[11px] text-slate-400 font-semibold">Hantar status markah kepada Dashboard Admin.</p>
+                                </div>
+                                ${markahVerification ? renderVerificationStatus(markahVerification.status) : '<span class="text-[10px] font-black text-slate-400">BELUM DIHANTAR</span>'}
+                            </div>
+                            <button onclick="submitClassVerification('MARKAH')" class="no-print w-full px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-black flex items-center justify-center gap-2">
+                                <i data-lucide="send" class="w-4 h-4"></i> HANTAR PENGESAHAN PENTAKSIRAN
+                            </button>
+                        </div>
+                        <div class="border border-slate-100 rounded-2xl p-4 space-y-3">
+                            <div class="flex items-center justify-between gap-3">
+                                <div>
+                                    <h4 class="font-black text-slate-800 text-sm">Pengesahan PBD</h4>
+                                    <p class="text-[11px] text-slate-400 font-semibold">Hantar status PBD kepada Dashboard Admin.</p>
+                                </div>
+                                ${pbdVerification ? renderVerificationStatus(pbdVerification.status) : '<span class="text-[10px] font-black text-slate-400">BELUM DIHANTAR</span>'}
+                            </div>
+                            <button onclick="submitClassVerification('PBD')" class="no-print w-full px-4 py-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-black flex items-center justify-center gap-2">
+                                <i data-lucide="send" class="w-4 h-4"></i> HANTAR PENGESAHAN PBD
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        async function updateAdminVerification(id, status) {
+            try {
+                const { error } = await supabaseClient
+                    .from('semakan_guru_kelas')
+                    .update({ status, tarikh: new Date().toISOString() })
+                    .eq('id', id);
+                if (error) throw error;
+                await fetchAllDataFromSupabase();
+                showToast(`Status telah dikemas kini: ${status}`, 'success');
+                renderPage();
+            } catch (e) {
+                console.error('Gagal kemas kini pengesahan admin:', e);
+                showToast('Gagal kemas kini status pengesahan.', 'danger');
+            }
+        }
+
+        function renderAdminClassVerificationPanel() {
+            const rows = (classVerificationRows || []).filter(r => String(r.tahun) === String(selectedYear) && r.assessment === selectedAssessment);
+            return `
+                <div class="bg-white rounded-2xl border border-blue-100 shadow-sm overflow-hidden">
+                    <div class="p-5 border-b border-blue-100 bg-gradient-to-r from-blue-50 to-purple-50 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                        <div>
+                            <h3 class="font-black text-slate-800 text-sm flex items-center gap-2">
+                                <i data-lucide="shield-check" class="w-5 h-5 text-blue-600"></i>
+                                Pengesahan Guru Kelas Untuk Admin
+                            </h3>
+                            <p class="text-[11px] text-slate-500 font-semibold mt-1">Semak pengesahan pentaksiran dan PBD yang dihantar oleh Guru Kelas.</p>
+                        </div>
+                        <button onclick="fetchAllDataFromSupabase().then(()=>{showToast('Pengesahan admin telah disegerakkan.', 'success'); renderPage();})" class="no-print px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5">
+                            <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i> Segar
+                        </button>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse text-xs">
+                            <thead>
+                                <tr class="bg-slate-50 border-b border-slate-100 text-[10px] font-black text-slate-400 uppercase tracking-wider">
+                                    <th class="p-4">Kelas</th>
+                                    <th class="p-4">Pentaksiran</th>
+                                    <th class="p-4">Jenis</th>
+                                    <th class="p-4">Guru Kelas</th>
+                                    <th class="p-4">Tarikh</th>
+                                    <th class="p-4 text-center">Status</th>
+                                    <th class="p-4 text-center no-print">Tindakan</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-50">
+                                ${rows.length === 0 ? `<tr><td colspan="7" class="p-6 text-center text-slate-400 font-bold">Belum ada pengesahan Guru Kelas.</td></tr>` : rows.map(r => `
+                                    <tr class="hover:bg-slate-50/60">
+                                        <td class="p-4 font-black text-slate-800">${r.kelas}</td>
+                                        <td class="p-4 text-slate-600 font-semibold">${r.assessment}</td>
+                                        <td class="p-4 font-black text-blue-700">${r.jenis}</td>
+                                        <td class="p-4 text-slate-600 font-semibold">${r.guru_kelas || '-'}</td>
+                                        <td class="p-4 text-slate-500 font-semibold">${formatDateTimeMY(r.tarikh)}</td>
+                                        <td class="p-4 text-center">${renderVerificationStatus(r.status)}</td>
+                                        <td class="p-4 text-center no-print">
+                                            <div class="flex items-center justify-center gap-2">
+                                                <button onclick="updateAdminVerification(${r.id}, 'Disahkan Admin')" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[10px] font-black">SAHKAN</button>
+                                                <button onclick="updateAdminVerification(${r.id}, 'Perlu Pembetulan')" class="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-[10px] font-black">PULANGKAN</button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            `;
+        }
+
         // --- RENDER DYNAMIC PAGES ---
         function renderPage() {
             const content = document.getElementById('page-content');
+            if (!content) return;
+            if (!currentUser) {
+                content.innerHTML = '';
+                return;
+            }
             
             if (currentPage === 'dashboard') {
                 const totalStudents = students.length;
@@ -1753,62 +2724,62 @@ currentUser.fullName = namaGuru;
 
                 content.innerHTML = `
                     <div class="space-y-6">
-                        <div class="bg-gradient-to-r from-emerald-600 to-teal-600 text-white p-6 md:p-8 rounded-3xl shadow-md border border-emerald-500/10 relative overflow-hidden">
+                        <div class="bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 text-white p-6 md:p-8 rounded-3xl shadow-md border border-blue-500/10 relative overflow-hidden">
                             <div class="relative z-10 space-y-2">
-                                <h3 class="text-xl md:text-2xl font-extrabold tracking-tight">Selamat Datang, ${currentUser.name}</h3>
-                                <p class="text-xs md:text-sm text-emerald-100 font-medium">Sistem Pengurusan Murid, Analisis Akademik Pentaksiran UASA & Penilaian Bilik Darjah (PBD).</p>
+                                <h3 class="text-xl md:text-2xl font-extrabold tracking-tight">Selamat Datang, ${currentUser?.name || 'Guru'}</h3>
+                                <p class="text-xs md:text-sm text-blue-100 font-medium">Sistem Pengurusan Murid, Analisis Akademik Pentaksiran UASA & Penilaian Bilik Darjah (PBD).</p>
                             </div>
                             <i data-lucide="sparkles" class="absolute right-6 bottom-4 w-28 h-28 opacity-10 rotate-12"></i>
                         </div>
 
                         <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                            <div class="bg-white p-6 rounded-2xl border border-emerald-100 shadow-sm flex items-center gap-4">
-                                <div class="bg-emerald-50 text-emerald-600 p-3.5 rounded-xl"><i data-lucide="users" class="w-6 h-6"></i></div>
+                            <div class="bg-white p-6 rounded-2xl border border-blue-100 shadow-sm flex items-center gap-4">
+                                <div class="theme-soft-blue p-3.5 rounded-xl"><i data-lucide="users" class="w-6 h-6"></i></div>
                                 <div>
                                     <p class="text-[11px] font-bold text-gray-400 uppercase">Jumlah Murid Terdaftar</p>
                                     <h4 class="text-2xl font-bold text-gray-800">${totalStudents} Orang</h4>
                                 </div>
                             </div>
-                            <div class="bg-white p-6 rounded-2xl border border-emerald-100 shadow-sm flex items-center gap-4">
-                                <div class="bg-teal-50 text-teal-600 p-3.5 rounded-xl"><i data-lucide="school" class="w-6 h-6"></i></div>
+                            <div class="bg-white p-6 rounded-2xl border border-blue-100 shadow-sm flex items-center gap-4">
+                                <div class="theme-soft-purple p-3.5 rounded-xl"><i data-lucide="school" class="w-6 h-6"></i></div>
                                 <div>
                                     <p class="text-[11px] font-bold text-gray-400 uppercase">Jumlah Bilik Kelas</p>
                                     <h4 class="text-2xl font-bold text-gray-800">${totalClasses} Kelas</h4>
                                 </div>
                             </div>
-                            <div class="bg-white p-6 rounded-2xl border border-emerald-100 shadow-sm flex items-center gap-4">
-                                <div class="bg-cyan-50 text-cyan-600 p-3.5 rounded-xl"><i data-lucide="book-open-check" class="w-6 h-6"></i></div>
+                            <div class="bg-white p-6 rounded-2xl border border-blue-100 shadow-sm flex items-center gap-4">
+                                <div class="theme-soft-orange p-3.5 rounded-xl"><i data-lucide="book-open-check" class="w-6 h-6"></i></div>
                                 <div>
                                     <p class="text-[11px] font-bold text-gray-400 uppercase">Subjek Teras Dipantau</p>
-                                    <h4 class="text-2xl font-bold text-gray-800">${totalSubjects} Matapelajaran</h4>
+                                    <h4 class="text-2xl font-bold text-gray-800">${totalSubjects} Mata Pelajaran</h4>
                                 </div>
                             </div>
                         </div>
 
                         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                            <div class="bg-white p-6 rounded-2xl border border-emerald-100 shadow-sm space-y-4">
-                                <h3 class="font-bold text-gray-800 text-base flex items-center gap-2"><i data-lucide="activity" class="w-5 h-5 text-emerald-600"></i> Aktiviti Pintas</h3>
+                            <div class="bg-white p-6 rounded-2xl border border-blue-100 shadow-sm space-y-4">
+                                <h3 class="font-bold text-gray-800 text-base flex items-center gap-2"><i data-lucide="activity" class="w-5 h-5 text-blue-600"></i> Aktiviti Pintas</h3>
                                 <div class="grid grid-cols-2 gap-3">
-                                    <button onclick="navigate('pengisian_markah')" class="p-4 border border-emerald-50/60 rounded-xl bg-emerald-50/20 hover:bg-emerald-50 hover:border-emerald-200 text-left transition-all group">
-                                        <i data-lucide="edit-3" class="w-5 h-5 text-emerald-600 mb-2"></i>
+                                    <button onclick="navigate('pengisian_markah')" class="p-4 border border-blue-50/60 rounded-xl bg-blue-50/20 hover:bg-blue-50 hover:border-blue-200 text-left transition-all group">
+                                        <i data-lucide="edit-3" class="w-5 h-5 text-blue-600 mb-2"></i>
                                         <p class="text-xs font-bold text-gray-800">Isi Markah</p>
                                         <p class="text-[10px] text-gray-400 font-medium">Buka gred pentaksiran</p>
                                     </button>
-                                    <button onclick="navigate('analisis')" class="p-4 border border-teal-50/60 rounded-xl bg-teal-50/20 hover:bg-teal-50 hover:border-teal-200 text-left transition-all group">
-                                        <i data-lucide="trending-up" class="w-5 h-5 text-teal-600 mb-2"></i>
+                                    <button onclick="navigate('analisis')" class="p-4 border border-purple-50/60 rounded-xl bg-purple-50/20 hover:bg-purple-50 hover:border-purple-200 text-left transition-all group">
+                                        <i data-lucide="trending-up" class="w-5 h-5 text-purple-600 mb-2"></i>
                                         <p class="text-xs font-bold text-gray-800">Analisis Prestasi</p>
                                         <p class="text-[10px] text-gray-400 font-medium">Statistik UASA & PBD</p>
                                     </button>
                                 </div>
                             </div>
-                            <div class="bg-white p-6 rounded-2xl border border-emerald-100 shadow-sm flex flex-col justify-between">
+                            <div class="bg-white p-6 rounded-2xl border border-blue-100 shadow-sm flex flex-col justify-between">
                                 <div>
                                     <h3 class="font-bold text-gray-800 text-base flex items-center gap-2 mb-2"><i data-lucide="info" class="w-5 h-5 text-slate-700"></i> Status Pangkalan Data</h3>
                                     <p class="text-xs text-gray-500 font-medium leading-relaxed">Sistem disepadukan bersama Supabase. Semua transaksi pendaftaran dan pengisian dikemaskini secara masa nyata.</p>
                                 </div>
                                 <div class="mt-4 pt-3 border-t border-slate-50 flex items-center justify-between">
-                                    <span class="flex items-center gap-1.5 text-xs text-emerald-600 font-semibold">
-                                        <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping"></span>
+                                    <span class="flex items-center gap-1.5 text-xs text-blue-600 font-semibold">
+                                        <span class="w-2.5 h-2.5 rounded-full bg-blue-500 animate-ping"></span>
                                         ${supabaseEnabled ? 'Supabase Berhubung' : 'Mod Simpanan Tempatan'}
                                     </span>
                                     <span class="text-[10px] text-gray-400 font-bold uppercase">Versi 1.6.0</span>
@@ -1817,6 +2788,8 @@ currentUser.fullName = namaGuru;
                         </div>
 
                         ${isAdmin ? renderFillingStatusPanel('admin') : ''}
+                        ${isAdmin ? renderAdminClassVerificationPanel() : ''}
+                        ${(!isAdmin && currentUser?.role === 'Guru') ? renderTeacherOwnStatusPanel() : ''}
                     </div>
                 `;
             }
@@ -1832,10 +2805,10 @@ currentUser.fullName = namaGuru;
 
                 content.innerHTML = `
                     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                        <div class="lg:col-span-2 bg-white rounded-2xl border border-emerald-100 shadow-sm overflow-hidden flex flex-col h-[70vh]">
-                            <div class="p-4 border-b border-emerald-100 flex flex-col sm:flex-row gap-3 items-center justify-between">
+                        <div class="lg:col-span-2 bg-white rounded-2xl border border-blue-100 shadow-sm overflow-hidden flex flex-col h-[70vh]">
+                            <div class="p-4 border-b border-blue-100 flex flex-col sm:flex-row gap-3 items-center justify-between">
                                 <div class="relative w-full sm:max-w-xs">
-                                    <input type="text" id="search-students" value="${searchQuery}" oninput="searchQuery = this.value; renderPage()" placeholder="Cari Nama/Mykad/Kelas..." class="w-full pl-9 pr-4 py-2 border border-gray-200 rounded-xl text-xs outline-none focus:ring-2 focus:ring-emerald-500">
+                                    <input type="text" id="search-students" value="${searchQuery}" oninput="searchQuery = this.value; renderPage()" placeholder="Cari Nama/Mykad/Kelas..." class="w-full pl-9 pr-4 py-2 border border-gray-200 rounded-xl text-xs outline-none focus:ring-2 focus:ring-blue-500">
                                     <i data-lucide="search" class="absolute left-3 top-2.5 w-4 h-4 text-gray-400"></i>
                                 </div>
                                 <span class="text-xs font-bold text-slate-400 shrink-0">Menunjukkan ${filtered.length} rekod</span>
@@ -1856,7 +2829,7 @@ currentUser.fullName = namaGuru;
                                             <tr class="hover:bg-slate-50/50">
                                                 <td class="p-4 font-bold text-gray-800">${s.nama}</td>
                                                 <td class="p-4 text-gray-500 font-semibold">${s.ic}</td>
-                                                <td class="p-4"><span class="bg-emerald-50 text-emerald-700 text-[10px] px-2.5 py-1 rounded-full font-bold">${s.kelas}</span></td>
+                                                <td class="p-4"><span class="bg-blue-50 text-blue-700 text-[10px] px-2.5 py-1 rounded-full font-bold">${s.kelas}</span></td>
                                                 <td class="p-4 text-right">
                                                     <button onclick="deleteStudent(${s.id})" class="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-all" title="Padam Rekod">
                                                         <i data-lucide="trash-2" class="w-4 h-4"></i>
@@ -1871,42 +2844,42 @@ currentUser.fullName = namaGuru;
 
                         <div class="space-y-6">
                             <!-- Pendaftaran Manual -->
-                            <div class="bg-white p-6 rounded-2xl border border-emerald-100 shadow-sm space-y-4">
-                                <h3 class="font-bold text-gray-800 text-base flex items-center gap-2"><i data-lucide="user-plus" class="w-5 h-5 text-emerald-600"></i> Daftar Manual</h3>
+                            <div class="bg-white p-6 rounded-2xl border border-blue-100 shadow-sm space-y-4">
+                                <h3 class="font-bold text-gray-800 text-base flex items-center gap-2"><i data-lucide="user-plus" class="w-5 h-5 text-blue-600"></i> Daftar Manual</h3>
                                 <form id="manual-reg-form" onsubmit="handleManualRegisterSubmit(event)" class="space-y-3">
                                     <div class="space-y-1">
                                         <label class="text-[11px] font-bold text-gray-400 uppercase">Nama Murid</label>
-                                        <input id="admin-reg-nama" type="text" required class="w-full p-2.5 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500 text-xs font-semibold" placeholder="CONTOH: ALI BIN ABU">
+                                        <input id="admin-reg-nama" type="text" required class="w-full p-2.5 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 text-xs font-semibold" placeholder="CONTOH: ALI BIN ABU">
                                     </div>
                                     <div class="space-y-1">
                                         <label class="text-[11px] font-bold text-gray-400 uppercase">MyKad (IC)</label>
-                                        <input id="admin-reg-ic" type="text" required class="w-full p-2.5 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500 text-xs font-semibold" placeholder="YYMMDD-SS-NNNN">
+                                        <input id="admin-reg-ic" type="text" required class="w-full p-2.5 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 text-xs font-semibold" placeholder="YYMMDD-SS-NNNN">
                                     </div>
                                     <div class="space-y-1">
                                         <label class="text-[11px] font-bold text-gray-400 uppercase">Kelas Pentaksiran</label>
-                                        <select id="admin-reg-kelas" class="w-full p-2.5 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500 text-xs font-semibold">
+                                        <select id="admin-reg-kelas" class="w-full p-2.5 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 text-xs font-semibold">
                                             ${classes.map(c => `<option value="${c}">${c}</option>`).join('')}
                                         </select>
                                     </div>
-                                    <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 rounded-xl transition-all shadow-sm text-xs">
+                                    <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded-xl transition-all shadow-sm text-xs">
                                         Simpan Pendaftaran
                                     </button>
                                 </form>
                             </div>
 
                             <!-- Muat Naik CSV -->
-                            <div class="bg-white p-6 rounded-2xl border border-emerald-100 shadow-sm space-y-4">
-                                <h3 class="font-bold text-gray-800 text-base flex items-center gap-2"><i data-lucide="file-up" class="w-5 h-5 text-teal-600"></i> Muat Naik Fail CSV</h3>
+                            <div class="bg-white p-6 rounded-2xl border border-blue-100 shadow-sm space-y-4">
+                                <h3 class="font-bold text-gray-800 text-base flex items-center gap-2"><i data-lucide="file-up" class="w-5 h-5 text-purple-600"></i> Muat Naik Fail CSV</h3>
                                 <div class="space-y-3">
-                                    <div class="border-2 border-dashed border-gray-200 hover:border-emerald-400 p-4 rounded-xl text-center transition-all relative">
+                                    <div class="border-2 border-dashed border-gray-200 hover:border-blue-400 p-4 rounded-xl text-center transition-all relative">
                                         <input type="file" id="csv-file-input" accept=".csv" onchange="handleCSVUpload(event)" class="absolute inset-0 opacity-0 cursor-pointer">
                                         <i data-lucide="upload-cloud" class="w-8 h-8 text-gray-400 mx-auto mb-2"></i>
                                         <p class="text-xs font-semibold text-gray-500">Klik atau heret fail CSV di sini</p>
                                         <p class="text-[10px] text-gray-400 font-medium">Format: Nama, IC, Kelas</p>
                                     </div>
-                                    <div id="csv-preview-info" class="hidden bg-emerald-50 border border-emerald-100 text-emerald-800 text-[11px] p-2.5 rounded-xl font-bold"></div>
+                                    <div id="csv-preview-info" class="hidden bg-blue-50 border border-blue-100 text-emerald-800 text-[11px] p-2.5 rounded-xl font-bold"></div>
                                     
-                                    <button type="button" onclick="saveCSVData()" class="w-full bg-teal-600 hover:bg-teal-700 text-white font-bold py-2.5 rounded-xl transition-all shadow-sm text-xs flex items-center justify-center gap-1.5">
+                                    <button type="button" onclick="saveCSVData()" class="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-2.5 rounded-xl transition-all shadow-sm text-xs flex items-center justify-center gap-1.5">
                                         <i data-lucide="save" class="w-4 h-4"></i> Simpan Data CSV ke Supabase
                                     </button>
                                 </div>
@@ -1924,44 +2897,44 @@ currentUser.fullName = namaGuru;
                 content.innerHTML = `
                     <div class="space-y-6">
                         <!-- Filters -->
-                        <div class="bg-white p-6 rounded-2xl border border-emerald-100 shadow-sm grid grid-cols-2 md:grid-cols-5 gap-3">
+                        <div class="bg-white p-6 rounded-2xl border border-blue-100 shadow-sm grid grid-cols-2 md:grid-cols-5 gap-3">
                             <div class="space-y-1">
                                 <label class="text-[10px] font-bold text-gray-400 uppercase">Sesi Akademik</label>
-                                <select id="sel-year" onchange="handleFilterChange()" class="w-full p-2 border border-gray-100 rounded-lg text-xs font-semibold outline-none focus:ring-1 focus:ring-emerald-500">
+                                <select id="sel-year" onchange="handleFilterChange()" class="w-full p-2 border border-gray-100 rounded-lg text-xs font-semibold outline-none focus:ring-1 focus:ring-blue-500">
                                     ${years.map(y => `<option value="${y}" ${selectedYear===y?'selected':''}>Sesi ${y}</option>`).join('')}
                                 </select>
                             </div>
                             <div class="space-y-1">
                                 <label class="text-[10px] font-bold text-gray-400 uppercase">Bilik Darjah</label>
-                                <select id="sel-class" onchange="handleFilterChange()" class="w-full p-2 border border-gray-100 rounded-lg text-xs font-semibold outline-none focus:ring-1 focus:ring-emerald-500">
+                                <select id="sel-class" onchange="handleFilterChange()" class="w-full p-2 border border-gray-100 rounded-lg text-xs font-semibold outline-none focus:ring-1 focus:ring-blue-500">
                                     ${classes.map(c => `<option value="${c}" ${selectedClass===c?'selected':''}>Kelas ${c}</option>`).join('')}
                                 </select>
                             </div>
                             <div class="space-y-1 col-span-2 md:col-span-1">
                                 <label class="text-[10px] font-bold text-gray-400 uppercase">Jenis Pentaksiran</label>
-                                <select id="sel-test" onchange="handleFilterChange()" class="w-full p-2 border border-gray-100 rounded-lg text-xs font-semibold outline-none focus:ring-1 focus:ring-emerald-500">
+                                <select id="sel-test" onchange="handleFilterChange()" class="w-full p-2 border border-gray-100 rounded-lg text-xs font-semibold outline-none focus:ring-1 focus:ring-blue-500">
                                     ${assessments.map(a => `<option value="${a}" ${selectedAssessment===a?'selected':''}>${a}</option>`).join('')}
                                 </select>
                             </div>
                             <div class="space-y-1">
-                                <label class="text-[10px] font-bold text-gray-400 uppercase">Matapelajaran</label>
-                                <select id="sel-subject" onchange="handleFilterChange()" class="w-full p-2 border border-gray-100 rounded-lg text-xs font-semibold outline-none focus:ring-1 focus:ring-emerald-500">
+                                <label class="text-[10px] font-bold text-gray-400 uppercase">Mata Pelajaran</label>
+                                <select id="sel-subject" onchange="handleFilterChange()" class="w-full p-2 border border-gray-100 rounded-lg text-xs font-semibold outline-none focus:ring-1 focus:ring-blue-500">
                                     ${subjectsToUse.map(s => `<option value="${s}" ${selectedSubject===s?'selected':''}>${s}</option>`).join('')}
                                 </select>
                             </div>
                             <div class="space-y-1 col-span-2 md:col-span-1">
                                 <label class="text-[10px] font-bold text-gray-400 uppercase">Nama Guru Pentaksir</label>
-                                <select id="sel-teacher" onchange="handleFilterChange()" class="w-full p-2 border border-gray-100 rounded-lg text-xs font-semibold outline-none focus:ring-1 focus:ring-emerald-500">
+                                <select id="sel-teacher" onchange="handleFilterChange()" class="w-full p-2 border border-gray-100 rounded-lg text-xs font-semibold outline-none focus:ring-1 focus:ring-blue-500">
                                     ${teachers.map(t => `<option value="${t}" ${selectedTeacher===t?'selected':''}>${t}</option>`).join('')}
                                 </select>
                             </div>
                         </div>
 
                         <!-- Data Table Card -->
-                        <div class="bg-white rounded-2xl border border-emerald-100 shadow-sm overflow-hidden">
+                        <div class="bg-white rounded-2xl border border-blue-100 shadow-sm overflow-hidden">
                             <div class="p-4 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
                                 <h3 class="font-bold text-gray-800 text-xs flex items-center gap-1.5 uppercase">
-                                    <span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
+                                    <span class="w-2.5 h-2.5 rounded-full bg-blue-500"></span>
                                     Prestasi Murid: ${selectedClass} (${activeStudents.length} Murid)
                                 </h3>
                                 <div class="flex items-center gap-2">
@@ -2020,10 +2993,10 @@ currentUser.fullName = namaGuru;
                             </div>
 
                             <div class="p-5 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-3">
-                                <button onclick="saveMarks()" class="w-full sm:w-auto px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 shadow-sm transition-all">
+                                <button onclick="saveMarks()" class="w-full sm:w-auto px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 shadow-sm transition-all">
                                     <i data-lucide="save" class="w-4 h-4"></i> SIMPAN
                                 </button>
-                                <button onclick="hantarKeGuruKelas()" class="w-full sm:w-auto px-5 py-2.5 bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 transition-all">
+                                <button onclick="hantarKeGuruKelas()" class="w-full sm:w-auto px-5 py-2.5 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 transition-all">
                                     <i data-lucide="send" class="w-4 h-4"></i> HANTAR SAHAJA
                                 </button>
                             </div>
@@ -2037,19 +3010,19 @@ currentUser.fullName = namaGuru;
                     <div class="space-y-6">
                         <!-- Navigation tabs -->
                         <div class="flex flex-wrap items-center gap-2 border-b border-slate-200 no-print">
-                            <button onclick="changeAnalysisMode('sumatif_grade_report')" class="px-4 py-2 text-xs font-bold transition-all border-b-2 ${analysisSelectedMode==='sumatif_grade_report'?'border-emerald-600 text-emerald-700':'border-transparent text-gray-400 hover:text-slate-600'}">
+                            <button onclick="changeAnalysisMode('sumatif_grade_report')" class="px-4 py-2 text-xs font-bold transition-all border-b-2 ${analysisSelectedMode==='sumatif_grade_report'?'border-emerald-600 text-blue-700':'border-transparent text-gray-400 hover:text-slate-600'}">
                                 📋 Analisis Sumatif A-F
                             </button>
-                            <button onclick="changeAnalysisMode('overall_pbd_report')" class="px-4 py-2 text-xs font-bold transition-all border-b-2 ${analysisSelectedMode==='overall_pbd_report'?'border-emerald-600 text-emerald-700':'border-transparent text-gray-400 hover:text-slate-600'}">
+                            <button onclick="changeAnalysisMode('overall_pbd_report')" class="px-4 py-2 text-xs font-bold transition-all border-b-2 ${analysisSelectedMode==='overall_pbd_report'?'border-emerald-600 text-blue-700':'border-transparent text-gray-400 hover:text-slate-600'}">
                                 📊 Laporan Keseluruhan Kelas (etert.jpg)
                             </button>
-                            <button onclick="changeAnalysisMode('pbd_excel_dashboard')" class="px-4 py-2 text-xs font-bold transition-all border-b-2 ${analysisSelectedMode==='pbd_excel_dashboard'?'border-emerald-600 text-emerald-700':'border-transparent text-gray-400 hover:text-slate-600'}">
+                            <button onclick="changeAnalysisMode('pbd_excel_dashboard')" class="px-4 py-2 text-xs font-bold transition-all border-b-2 ${analysisSelectedMode==='pbd_excel_dashboard'?'border-emerald-600 text-blue-700':'border-transparent text-gray-400 hover:text-slate-600'}">
                                 📈 Format Excel Mengikut Kelas & Subjek
                             </button>
-                            <button onclick="changeAnalysisMode('individu')" class="px-4 py-2 text-xs font-bold transition-all border-b-2 ${analysisSelectedMode==='individu'?'border-emerald-600 text-emerald-700':'border-transparent text-gray-400 hover:text-slate-600'}">
+                            <button onclick="changeAnalysisMode('individu')" class="px-4 py-2 text-xs font-bold transition-all border-b-2 ${analysisSelectedMode==='individu'?'border-emerald-600 text-blue-700':'border-transparent text-gray-400 hover:text-slate-600'}">
                                 Roster Murid Individu
                             </button>
-                            <button onclick="changeAnalysisMode('pbd_ringkasan')" class="px-4 py-2 text-xs font-bold transition-all border-b-2 ${analysisSelectedMode==='pbd_ringkasan'?'border-emerald-600 text-emerald-700':'border-transparent text-gray-400 hover:text-slate-600'}">
+                            <button onclick="changeAnalysisMode('pbd_ringkasan')" class="px-4 py-2 text-xs font-bold transition-all border-b-2 ${analysisSelectedMode==='pbd_ringkasan'?'border-emerald-600 text-blue-700':'border-transparent text-gray-400 hover:text-slate-600'}">
                                 Ringkasan TP PBD
                             </button>
                         </div>
@@ -2064,7 +3037,7 @@ currentUser.fullName = namaGuru;
 
             else if (currentPage === 'settings') {
                 content.innerHTML = `
-                    <div class="max-w-xl mx-auto bg-white p-6 md:p-8 rounded-3xl border border-emerald-100 shadow-sm space-y-6">
+                    <div class="max-w-xl mx-auto bg-white p-6 md:p-8 rounded-3xl border border-blue-100 shadow-sm space-y-6">
                         <div class="space-y-2">
                             <h3 class="text-lg font-bold text-gray-800">Sistem Tetapan & Utiliti</h3>
                             <p class="text-xs text-gray-500 leading-relaxed font-medium">Urus pangkalan data, bersihkan cache lokal, atau set semula data standard pentaksiran SK Bukit Tongkat.</p>
@@ -2076,7 +3049,7 @@ currentUser.fullName = namaGuru;
                                     <p class="text-xs font-bold text-gray-800">Segar Semula Data Supabase</p>
                                     <p class="text-[10px] text-gray-400 font-medium">Segerakan data murid & markah dari awan.</p>
                                 </div>
-                                <button onclick="fetchAllDataFromSupabase().then(()=>showToast('Selesai penyegerakan!', 'success'))" class="px-3 py-2 bg-emerald-600 text-white rounded-xl text-xs font-bold hover:bg-emerald-700 transition-all flex items-center gap-1">
+                                <button onclick="fetchAllDataFromSupabase().then(()=>showToast('Selesai penyegerakan!', 'success'))" class="px-3 py-2 bg-blue-600 text-white rounded-xl text-xs font-bold hover:bg-blue-700 transition-all flex items-center gap-1">
                                     <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i> Segerakan
                                 </button>
                             </div>
@@ -2096,48 +3069,67 @@ currentUser.fullName = namaGuru;
             }
 
             else if (currentPage === 'guru_kelas_dashboard') {
-                const assignedClass = '1 AR-RAZI';
-                const classStudents = students.filter(s => s.kelas === assignedClass);
+                const allowedClasses = getAllowedGuruKelasClasses();
+                if ((!guruKelasSelectedClass || !allowedClasses.some(a => a.kelas === guruKelasSelectedClass)) && allowedClasses.length > 0) {
+                    guruKelasSelectedClass = allowedClasses[0].kelas;
+                }
 
-                content.innerHTML = `
-                    <div class="space-y-6">
-                        <div class="bg-gradient-to-r from-teal-600 to-cyan-600 text-white p-6 rounded-3xl shadow-sm border border-teal-500/10 relative overflow-hidden">
-                            <div class="relative z-10 space-y-1">
-                                <h3 class="text-lg md:text-xl font-bold tracking-tight">Kabin Kawalan Guru Kelas: ${assignedClass}</h3>
-                                <p class="text-[11px] md:text-xs text-teal-100 font-medium">Uruskan, jejak, dan semak penyata akhir UASA murid anda.</p>
+                if (allowedClasses.length === 0) {
+                    content.innerHTML = `
+                        <div class="bg-white p-8 rounded-3xl border border-rose-100 shadow-sm space-y-3 text-center">
+                            <div class="w-14 h-14 bg-rose-50 text-rose-600 rounded-full flex items-center justify-center mx-auto">
+                                <i data-lucide="lock" class="w-7 h-7"></i>
                             </div>
-                            <i data-lucide="presentation" class="absolute right-6 bottom-4 w-24 h-24 opacity-10 rotate-6"></i>
+                            <h3 class="text-lg font-black text-slate-800">Akses Guru Kelas Tidak Ditemui</h3>
+                            <p class="text-sm text-slate-500 font-semibold max-w-xl mx-auto">Emel akaun ini belum dipadankan sebagai Guru Kelas atau Pembantu Guru Kelas. Sila semak column guru_email dan pembantu_email dalam jadual class_teachers.</p>
                         </div>
+                    `;
+                } else {
+                    const assignedClass = guruKelasSelectedClass;
+                    const classStudents = students.filter(s => s.kelas === assignedClass);
 
-                        ${renderFillingStatusPanel('guru_kelas', assignedClass)}
+                    content.innerHTML = `
+                        <div class="space-y-6">
+                            <div class="bg-gradient-to-r from-purple-600 to-blue-600 text-white p-6 rounded-3xl shadow-sm border border-purple-500/10 relative overflow-hidden">
+                                <div class="relative z-10 space-y-1">
+                                    <h3 class="text-lg md:text-xl font-bold tracking-tight">Dashboard Guru Kelas: ${assignedClass}</h3>
+                                    <p class="text-[11px] md:text-xs text-purple-100 font-medium">Aliran rasmi semakan pentaksiran, PBD dan pengesahan kepada Admin.</p>
+                                </div>
+                                <i data-lucide="presentation" class="absolute right-6 bottom-4 w-24 h-24 opacity-10 rotate-6"></i>
+                            </div>
 
-                        <div class="bg-white p-6 rounded-2xl border border-emerald-100 shadow-sm space-y-4">
-                            <h3 class="font-bold text-gray-800 text-sm flex items-center gap-1.5"><i data-lucide="users" class="w-5 h-5 text-teal-600"></i> Senarai Roster Kelas (${classStudents.length} Murid)</h3>
-                            <div class="overflow-y-auto max-h-[400px]">
-                                <table class="w-full text-left border-collapse text-xs">
-                                    <thead>
-                                        <tr class="bg-slate-50 border-b border-slate-100 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                                            <th class="p-3">Nama Murid</th>
-                                            <th class="p-3">No. MyKad</th>
-                                            <th class="p-3 text-right">Perincian</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody class="divide-y divide-slate-50">
-                                        ${classStudents.map(cs => `
-                                            <tr class="hover:bg-slate-50/20">
-                                                <td class="p-3 font-bold text-slate-800">${cs.nama}</td>
-                                                <td class="p-3 text-slate-500 font-medium">${cs.ic}</td>
-                                                <td class="p-3 text-right">
-                                                    <button onclick="viewStudentPerformance(${cs.id})" class="text-teal-600 hover:underline font-bold">Analisis</button>
-                                                </td>
+                            ${renderGuruKelasOfficialFlow(assignedClass)}
+
+                            ${renderFillingStatusPanel('guru_kelas', assignedClass)}
+
+                            <div class="bg-white p-6 rounded-2xl border border-blue-100 shadow-sm space-y-4">
+                                <h3 class="font-bold text-gray-800 text-sm flex items-center gap-1.5"><i data-lucide="users" class="w-5 h-5 text-purple-600"></i> Senarai Roster Kelas (${classStudents.length} Murid)</h3>
+                                <div class="overflow-y-auto max-h-[400px]">
+                                    <table class="w-full text-left border-collapse text-xs">
+                                        <thead>
+                                            <tr class="bg-slate-50 border-b border-slate-100 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                                                <th class="p-3">Nama Murid</th>
+                                                <th class="p-3">No. MyKad</th>
+                                                <th class="p-3 text-right">Perincian</th>
                                             </tr>
-                                        `).join('')}
-                                    </tbody>
-                                </table>
+                                        </thead>
+                                        <tbody class="divide-y divide-slate-50">
+                                            ${classStudents.map(cs => `
+                                                <tr class="hover:bg-slate-50/20">
+                                                    <td class="p-3 font-bold text-slate-800">${cs.nama}</td>
+                                                    <td class="p-3 text-slate-500 font-medium">${cs.ic}</td>
+                                                    <td class="p-3 text-right">
+                                                        <button onclick="viewStudentPerformance(${cs.id})" class="text-purple-600 hover:underline font-bold">Analisis</button>
+                                                    </td>
+                                                </tr>
+                                            `).join('')}
+                                        </tbody>
+                                    </table>
+                                </div>
                             </div>
                         </div>
-                    </div>
-                `;
+                    `;
+                }
             }
 
             lucide.createIcons();
@@ -2260,7 +3252,7 @@ currentUser.fullName = namaGuru;
                             </div>
                         </div>
                         <div class="flex items-center gap-2">
-                            <button onclick="exportSumatifGradeExcel()" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg text-xs flex items-center gap-1.5 transition-all shadow-sm">
+                            <button onclick="exportSumatifGradeExcel()" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg text-xs flex items-center gap-1.5 transition-all shadow-sm">
                                 <i data-lucide="file-spreadsheet" class="w-4 h-4"></i> Export Excel
                             </button>
                             <button onclick="printReport()" class="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white font-bold rounded-lg text-xs flex items-center gap-1.5 transition-all shadow-sm">
@@ -2360,7 +3352,7 @@ currentUser.fullName = namaGuru;
                         </div>
                         <div class="bg-white p-4 rounded-xl border border-slate-100 shadow-sm">
                             <p class="text-[10px] font-bold text-slate-400 uppercase">Peratus TP3-TP6</p>
-                            <h4 class="text-lg font-bold text-emerald-600">${pctTP3_6}%</h4>
+                            <h4 class="text-lg font-bold text-blue-600">${pctTP3_6}%</h4>
                         </div>
                     </div>
 
@@ -2368,7 +3360,7 @@ currentUser.fullName = namaGuru;
                     <div class="bg-white p-4 rounded-xl border border-slate-100 shadow-sm flex flex-col md:flex-row items-center justify-between gap-3 no-print font-bold">
                         <span class="text-xs text-slate-500">Menjana Laporan Keseluruhan Merentasi Sesi Akademik ${analysisSelectedAcademicYearPBD}</span>
                         <div class="flex items-center gap-2">
-                            <button onclick="exportOverallExcel()" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg text-xs flex items-center gap-1.5 transition-all shadow-sm">
+                            <button onclick="exportOverallExcel()" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg text-xs flex items-center gap-1.5 transition-all shadow-sm">
                                 <i data-lucide="file-spreadsheet" class="w-4 h-4"></i> 📊 Export Excel
                             </button>
                             <button onclick="printReport()" class="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white font-bold rounded-lg text-xs flex items-center gap-1.5 transition-all shadow-sm">
@@ -2479,7 +3471,7 @@ currentUser.fullName = namaGuru;
                             <h3 class="text-xs font-bold uppercase tracking-wider text-slate-800">📌 RUMUSAN PRESTASI AKADEMIK KESELURUHAN (TAHUN 1 - 6)</h3>
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div class="p-4 border border-black rounded bg-slate-50 space-y-2">
-                                    <p class="text-xs font-semibold">🏆 Mata Pelajaran Terbaik (TP3-TP6 Terbanyak): <span class="text-emerald-700 font-extrabold uppercase">BAHASA MELAYU</span></p>
+                                    <p class="text-xs font-semibold">🏆 Mata Pelajaran Terbaik (TP3-TP6 Terbanyak): <span class="text-blue-700 font-extrabold uppercase">BAHASA MELAYU</span></p>
                                     <p class="text-xs font-semibold">⚠️ Mata Pelajaran Sasaran Intervensi: <span class="text-rose-700 font-extrabold uppercase">BAHASA INGGERIS</span></p>
                                     <p class="text-xs font-semibold">⭐ Kategori Penguasaan Tertinggi: <span class="font-extrabold text-blue-800">Tahap Penguasaan 4 (TP4) & 5 (TP5)</span></p>
                                 </div>
@@ -2525,7 +3517,7 @@ currentUser.fullName = namaGuru;
                             </div>
                         </div>
                         <div class="flex items-center gap-2">
-                            <button onclick="exportExcelReport()" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg text-xs flex items-center gap-1.5 transition-all shadow-sm">
+                            <button onclick="exportExcelReport()" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg text-xs flex items-center gap-1.5 transition-all shadow-sm">
                                 <i data-lucide="file-spreadsheet" class="w-4 h-4"></i> Export Excel
                             </button>
                             <button onclick="printReport()" class="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white font-bold rounded-lg text-xs flex items-center gap-1.5 transition-all shadow-sm">
@@ -2630,29 +3622,29 @@ currentUser.fullName = namaGuru;
 
             return `
                 <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    <div class="bg-white p-6 rounded-2xl border border-emerald-100 shadow-sm space-y-4">
+                    <div class="bg-white p-6 rounded-2xl border border-blue-100 shadow-sm space-y-4">
                         <div class="space-y-1">
                             <label class="text-[10px] font-bold text-gray-400 uppercase">Pilih Murid</label>
-                            <select onchange="analysisSelectedStudentId=this.value; renderPage()" class="w-full p-2.5 border border-gray-100 rounded-xl text-xs font-bold text-slate-700 outline-none focus:ring-1 focus:ring-emerald-500">
+                            <select onchange="analysisSelectedStudentId=this.value; renderPage()" class="w-full p-2.5 border border-gray-100 rounded-xl text-xs font-bold text-slate-700 outline-none focus:ring-1 focus:ring-blue-500">
                                 ${students.map(s => `<option value="${s.id}" ${s.id==analysisSelectedStudentId?'selected':''}>${s.nama} (${s.kelas})</option>`).join('')}
                             </select>
                         </div>
 
-                        <div class="p-4 bg-emerald-50/30 rounded-2xl border border-emerald-100/50 space-y-2">
-                            <div class="bg-emerald-600 text-white w-10 h-10 rounded-full flex items-center justify-center font-extrabold text-sm mb-2">${student.nama.charAt(0)}</div>
+                        <div class="p-4 bg-slate-100 rounded-2xl border border-blue-100/50 space-y-2">
+                            <div class="bg-blue-600 text-white w-10 h-10 rounded-full flex items-center justify-center font-extrabold text-sm mb-2">${student.nama.charAt(0)}</div>
                             <h4 class="font-bold text-slate-800 text-xs">${student.nama}</h4>
                             <p class="text-[10px] text-slate-500 font-semibold">${student.ic}</p>
-                            <p class="text-[10px] text-emerald-700 font-extrabold bg-emerald-50 inline-block px-2.5 py-0.5 rounded-full">${student.kelas}</p>
+                            <p class="text-[10px] text-blue-700 font-extrabold bg-blue-50 inline-block px-2.5 py-0.5 rounded-full">${student.kelas}</p>
                         </div>
                     </div>
 
-                    <div class="lg:col-span-2 bg-white p-6 rounded-2xl border border-emerald-100 shadow-sm space-y-4">
+                    <div class="lg:col-span-2 bg-white p-6 rounded-2xl border border-blue-100 shadow-sm space-y-4">
                         <h3 class="font-bold text-slate-800 text-sm">Profil Akademik Pentaksiran UASA & PBD</h3>
                         <div class="overflow-y-auto max-h-[300px] border border-slate-100 rounded-2xl">
                             <table class="w-full text-left border-collapse text-xs">
                                 <thead>
                                     <tr class="bg-slate-50 border-b border-slate-100 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                                        <th class="p-3">Matapelajaran</th>
+                                        <th class="p-3">Mata Pelajaran</th>
                                         <th class="p-3 text-center">Markah</th>
                                         <th class="p-3 text-center">Gred</th>
                                         <th class="p-3 text-center">PBD TP</th>
@@ -2672,7 +3664,7 @@ currentUser.fullName = namaGuru;
                                                 <td class="p-3 text-center">
                                                     <span class="inline-block px-2 py-0.5 rounded-full font-bold text-[9px] border ${gradeRes.color}">${gradeRes.grade}</span>
                                                 </td>
-                                                <td class="p-3 text-center"><span class="font-extrabold text-teal-600 bg-teal-50 px-2.5 py-0.5 rounded-full text-[9px]">${pbdVal}</span></td>
+                                                <td class="p-3 text-center"><span class="font-extrabold text-purple-600 bg-purple-50 px-2.5 py-0.5 rounded-full text-[9px]">${pbdVal}</span></td>
                                             </tr>
                                         `;
                                     }).join('')}
@@ -2687,7 +3679,7 @@ currentUser.fullName = namaGuru;
         // --- PERFORMANCE / RENDER FOR PBD RINGKASAN ---
         function renderAnalysisPBD() {
             return `
-                <div class="bg-white p-6 rounded-2xl border border-emerald-100 shadow-sm space-y-4">
+                <div class="bg-white p-6 rounded-2xl border border-blue-100 shadow-sm space-y-4">
                     <h3 class="font-bold text-slate-800 text-sm">Ringkasan Analisis Tahap Penguasaan (TP) PBD</h3>
                     <p class="text-xs text-slate-500 font-medium">Berdasarkan data pentaksiran yang disimpan, berikut adalah statistik purata pencapaian TP bagi kelas ${selectedClass}:</p>
                     <div class="grid grid-cols-2 md:grid-cols-6 gap-3 pt-3">
@@ -2695,7 +3687,7 @@ currentUser.fullName = namaGuru;
                             const count = Object.values(studentPBD).filter(v => v === tp).length;
                             return `
                                 <div class="p-4 border border-slate-100/80 bg-slate-50/30 rounded-2xl text-center space-y-1">
-                                    <span class="text-xs font-bold text-emerald-600">${tp}</span>
+                                    <span class="text-xs font-bold text-blue-600">${tp}</span>
                                     <h4 class="text-xl font-black text-slate-800">${count}</h4>
                                     <p class="text-[9px] text-slate-400 font-bold uppercase">Subjek Murid</p>
                                 </div>
@@ -2712,7 +3704,6 @@ currentUser.fullName = namaGuru;
             lucide.createIcons();
             renderPage();
         };
-    </script>
-
+    </script> 
 </body>
 </html>
