@@ -514,31 +514,23 @@
         }
 
 
-        // Penapis roster kelas yang lebih ketat untuk elak 4 AL-KHAWARIZMI bercampur dengan 4 AR-RAZI.
-        // Fungsi ini hanya mengawal PAPARAN senarai murid. Data markah dan PBD tidak dipadam.
-        const OFFICIAL_CLASS_LIMITS = {
-            '4 AL KHAWARIZMI': 23
-        };
-
-        function getOfficialClassLimit(kelasName) {
-            return OFFICIAL_CLASS_LIMITS[normalizeClassName(kelasName)] || null;
-        }
-
+        // Penapis roster kelas yang ketat.
+        // Nama murid diambil berdasarkan nama kelas sebenar dalam Supabase column `kelas`.
+        // Tiada data markah atau PBD dipadam. Fungsi ini hanya mengawal paparan roster.
         function getStudentsByExactClass(kelasName) {
-            let list = students
-                .filter(s => isSameClassOnly(s.kelas, kelasName))
-                .sort((a, b) => String(a.nama || '').localeCompare(String(b.nama || ''), 'ms'));
+            const targetClass = canonicalClassName(kelasName);
+            const seen = new Set();
 
-            // Perlindungan khas: 4 AL-KHAWARIZMI sepatutnya 23 murid sahaja.
-            // Jika data Supabase masih mengandungi 47 rekod berlabel 4 AL-KHAWARIZMI,
-            // paparan sistem dihadkan kepada 23 tanpa membuang sebarang markah.
-            const limit = getOfficialClassLimit(kelasName);
-            if (limit && list.length > limit) {
-                console.warn(`Roster ${kelasName} mempunyai ${list.length} rekod. Paparan dihadkan kepada ${limit} murid.`);
-                list = list.slice(0, limit);
-            }
-
-            return list;
+            return students
+                .filter(s => isSameClassOnly(s.kelas, targetClass))
+                .filter(s => {
+                    const key = String(s.ic || s.id || s.nama || '').trim().toUpperCase();
+                    if (!key) return true;
+                    if (seen.has(key)) return false;
+                    seen.add(key);
+                    return true;
+                })
+                .sort((a, b) => String(a.nama || '').localeCompare(String(b.nama || ''), 'ms', { sensitivity: 'base' }));
         }
 
         // Database Markah Sementara (In-Memory)
@@ -2909,7 +2901,9 @@ if (type === 'guru_kelas') {
 
             else if (currentPage === 'data_murid' && isAdmin) {
                 const searchVal = searchQuery.toUpperCase();
-                const filtered = students.filter(s => s.nama.includes(searchVal) || s.ic.includes(searchVal) || s.kelas.includes(searchVal));
+                const filtered = students
+                    .filter(s => s.nama.includes(searchVal) || s.ic.includes(searchVal) || s.kelas.includes(searchVal))
+                    .sort((a, b) => String(a.kelas || '').localeCompare(String(b.kelas || ''), 'ms', { sensitivity: 'base' }) || String(a.nama || '').localeCompare(String(b.nama || ''), 'ms', { sensitivity: 'base' }));
 
                 content.innerHTML = `
                     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -3057,6 +3051,7 @@ if (type === 'guru_kelas') {
                                 <table class="w-full text-left border-collapse min-w-[700px]">
                                     <thead>
                                         <tr class="bg-slate-50 border-b border-slate-100 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                                            <th class="p-4 w-14 text-center">Bil.</th>
                                             <th class="p-4 sticky-col">Nama Penuh Murid</th>
                                             <th class="p-4">No. MyKad</th>
                                             <th class="p-4 w-32">MARKAH (0-100)</th>
@@ -3065,7 +3060,7 @@ if (type === 'guru_kelas') {
                                         </tr>
                                     </thead>
                                     <tbody class="divide-y divide-slate-50 text-xs">
-                                        ${activeStudents.map(s => {
+                                        ${activeStudents.map((s, index) => {
                                             const key = `${s.id}_${selectedYear}_${selectedAssessment}_${selectedSubject}`;
                                             const mark = studentMarks[key] !== undefined ? studentMarks[key] : '';
                                             const pbd = studentPBD[key] || '';
@@ -3073,6 +3068,7 @@ if (type === 'guru_kelas') {
 
                                             return `
                                                 <tr class="student-row hover:bg-slate-50/20" data-id="${s.id}">
+                                                    <td class="p-4 text-center font-black text-slate-500">${index + 1}</td>
                                                     <td class="p-4 font-bold text-gray-800 sticky-col">${s.nama}</td>
                                                     <td class="p-4 text-slate-500 font-semibold">${s.ic}</td>
                                                     <td class="p-4">
@@ -3217,14 +3213,16 @@ if (type === 'guru_kelas') {
                                     <table class="w-full text-left border-collapse text-xs">
                                         <thead>
                                             <tr class="bg-slate-50 border-b border-slate-100 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                                                <th class="p-3 w-14 text-center">Bil.</th>
                                                 <th class="p-3">Nama Murid</th>
                                                 <th class="p-3">No. MyKad</th>
                                                 <th class="p-3 text-right">Perincian</th>
                                             </tr>
                                         </thead>
                                         <tbody class="divide-y divide-slate-50">
-                                            ${classStudents.map(cs => `
+                                            ${classStudents.map((cs, index) => `
                                                 <tr class="hover:bg-slate-50/20">
+                                                    <td class="p-3 text-center font-black text-slate-500">${index + 1}</td>
                                                     <td class="p-3 font-bold text-slate-800">${cs.nama}</td>
                                                     <td class="p-3 text-slate-500 font-medium">${cs.ic}</td>
                                                     <td class="p-3 text-right">
