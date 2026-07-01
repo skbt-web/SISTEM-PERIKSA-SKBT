@@ -499,12 +499,12 @@
             if (!value || !targetClass) return false;
             if (containsMultipleClasses(value)) return false;
 
-            const valueYear = getClassYearOnly(value);
-            const targetYear = getClassYearOnly(targetClass);
-            const valueStream = getClassStreamOnly(value);
-            const targetStream = getClassStreamOnly(targetClass);
+            const valueClass = normalizeClassName(value);
+            const targetClassName = normalizeClassName(targetClass);
 
-            return valueYear === targetYear && valueStream !== '' && valueStream === targetStream;
+            // Padanan kelas dibuat secara tepat supaya 4 AL-KHAWARIZMI tidak bercampur dengan 4 AR-RAZI.
+            // Tanda sempang dan jarak masih dibenarkan kerana normalizeClassName sudah menyeragamkannya.
+            return valueClass === targetClassName;
         }
 
         function canonicalClassName(value) {
