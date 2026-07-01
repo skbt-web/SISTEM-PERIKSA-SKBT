@@ -513,6 +513,25 @@
             return match || String(value || '').toUpperCase().trim();
         }
 
+
+        // Ambil murid berdasarkan kelas tepat sahaja.
+        // Ini menghalang 4 AR-RAZI bercampur dengan 4 AL-KHAWARIZMI.
+        // Markah tidak dipadam kerana fungsi ini hanya menapis paparan murid.
+        function getStudentsByExactClass(kelasName) {
+            return students
+                .filter(s => isSameClassOnly(s.kelas, kelasName))
+                .sort((a, b) => String(a.nama || '').localeCompare(String(b.nama || '')));
+        }
+
+        // Ambil murid berdasarkan tahun sahaja untuk laporan keseluruhan.
+        // Rekod yang mengandungi dua nama kelas serentak tidak dikira supaya data tidak berganda.
+        function getStudentsByYearOnly(yearNum) {
+            return students.filter(s =>
+                getClassYearOnly(s.kelas) === String(yearNum) &&
+                !containsMultipleClasses(s.kelas)
+            );
+        }
+
         // Database Markah Sementara (In-Memory)
         const studentMarks = {
             '14_2026_PENTAKSIRAN SUMATIF 1_BAHASA MELAYU': 85,
@@ -810,7 +829,7 @@
         // --- PENGIRAAN STATISTIK PBD AUTOMATIK ---
         function calculatePBDStatsForYear(yearNum) {
             const result = {};
-            const activeStudents = students.filter(s => s.kelas.startsWith(yearNum + ' '));
+            const activeStudents = getStudentsByYearOnly(yearNum);
 
             baseSubjects.forEach(sub => {
                 result[sub] = {
@@ -820,7 +839,7 @@
                 };
 
                 activeStudents.forEach(s => {
-                    const classKey = s.kelas.includes('AL-KHAWARIZMI') ? 'AL-KHAWARIZMI' : 'AR-RAZI';
+                    const classKey = getClassStreamOnly(s.kelas) === 'AL KHAWARIZMI' ? 'AL-KHAWARIZMI' : 'AR-RAZI';
                     const key = `${s.id}_${analysisSelectedAcademicYearPBD}_${analysisSelectedAssessment}_${sub}`;
                     const tp = studentPBD[key];
 
@@ -1558,7 +1577,7 @@ if (type === 'guru_kelas') {
 
         // --- STATUS PENGISIAN GURU / ADMIN ---
         function getClassStudentCount(kelasName) {
-            return students.filter(s => isSameClassOnly(s.kelas, kelasName)).length;
+            return getStudentsByExactClass(kelasName).length;
         }
 
         function buildFillingStatusRows(scope = 'admin', classFilter = null) {
@@ -2056,7 +2075,7 @@ if (type === 'guru_kelas') {
 
         function getSlipClassRank(student) {
             if (!student) return '-';
-            const classmates = students.filter(s => isSameClassOnly(s.kelas, student.kelas));
+            const classmates = getStudentsByExactClass(student.kelas);
             const scores = classmates.map(s => ({ id: s.id, total: getStudentTotalForSlip(s).total }))
                 .sort((a, b) => b.total - a.total);
             const index = scores.findIndex(s => String(s.id) === String(student.id));
@@ -2548,7 +2567,7 @@ if (type === 'guru_kelas') {
         }
 
         function getClassCompletionSummary(kelasName) {
-            const classStudents = students.filter(s => isSameClassOnly(s.kelas, kelasName));
+            const classStudents = getStudentsByExactClass(kelasName);
             const totalStudents = classStudents.length;
             const subjectList = getSubjectsForClass(kelasName);
             let completedSubjects = 0;
@@ -2972,7 +2991,7 @@ if (type === 'guru_kelas') {
             else if (currentPage === 'pengisian_markah') {
                 const classYearNum = parseInt(selectedClass.charAt(0)) || 1;
                 const subjectsToUse = baseSubjects;
-                const activeStudents = students.filter(s => isSameClassOnly(s.kelas, selectedClass));
+                const activeStudents = getStudentsByExactClass(selectedClass);
 
                 content.innerHTML = `
                     <div class="space-y-6">
@@ -3167,7 +3186,7 @@ if (type === 'guru_kelas') {
                     `;
                 } else {
                     const assignedClass = guruKelasSelectedClass;
-                    const classStudents = students.filter(s => isSameClassOnly(s.kelas, assignedClass));
+                    const classStudents = getStudentsByExactClass(assignedClass);
 
                     content.innerHTML = `
                         <div class="space-y-6">
@@ -3240,11 +3259,11 @@ if (type === 'guru_kelas') {
 
 
         function getSubjectStudentCountForYear(yearNum) {
-            return students.filter(s => String(s.kelas || '').startsWith(String(yearNum) + ' ')).length;
+            return getStudentsByYearOnly(yearNum).length;
         }
 
         function calculateGradeStatsForYear(yearNum, subject, assessmentName) {
-            const activeStudents = students.filter(s => String(s.kelas || '').startsWith(String(yearNum) + ' '));
+            const activeStudents = getStudentsByYearOnly(yearNum);
             const stats = { A: 0, B: 0, C: 0, D: 0, E: 0, F: 0, total: activeStudents.length, filled: 0 };
             activeStudents.forEach(st => {
                 const key = `${st.id}_${analysisSelectedAcademicYearPBD}_${assessmentName}_${subject}`;
@@ -3488,7 +3507,7 @@ if (type === 'guru_kelas') {
                                 </thead>
                                 <tbody>
                                     ${yearsList.map(yr => {
-                                        const yearStudents = students.filter(s => s.kelas.startsWith(yr + ' '));
+                                        const yearStudents = getStudentsByYearOnly(yr);
                                         const bilMurid = yearStudents.length;
                                         const stats = allStats[yr];
 
