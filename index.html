@@ -514,15 +514,71 @@
         }
 
 
+        // Senarai rasmi murid 4 AL-KHAWARIZMI.
+        // Digunakan untuk membetulkan paparan roster sahaja.
+        // Markah, PBD, id murid dan data Supabase tidak dipadam atau diubah.
+        const official4AlKhawarizmiNames = [
+            'AINNUR AMNI RAUDHAH BINTI INDRA',
+            'ANNA SYAFAA BINTI MOHD ARIFF',
+            'ANNA SYAHEEN BINTI MOHD ARIFF',
+            'MOHAMAD ADAM HARRIS BIN MOHD RAZIMAN',
+            'MUHAMMAD ADAM SUFFI BIN MOHD RASHID',
+            'MUHAMMAD AIRIEL ASYRAF BIN SHAHRIL',
+            'MUHAMMAD AQIL HARRAZ BIN MOHD AZLAN',
+            'MUHAMMAD HARRAZ BIN MOHD HOSNI',
+            'MUHAMMAD ILHAM QUSYAIRI BIN SALLEHUDDIN',
+            'MUHAMMAD IZZ AIMAN BIN SUBRI',
+            'NUR ALISHA NADIA BINTI MOHD ISMAIL',
+            'NUR ALISSA DAMIA BINTI MOHAMAD FAWZY',
+            'NUR AMMARA AISYAH BINTI MOHAMAD HARIUDIN',
+            'NUR IRDINA ALISHA BINTI NORISAM',
+            'NUR KHAIRUNNISSA BINTI ZAINAL',
+            'NUR SYAFIQAH BINTI MOHAMED KASIM',
+            'NUR ZAFIEQAH SAFIYYA BINTI MD ZAIN',
+            'NURLIYANA FATHIAH BINTI MOHD SHAHRUL',
+            'NURUL AIN HUMAIRAH BINTI MOHD NAZRI',
+            'PUTERI ARISYA IRDINA BINTI MUHAMAD IDHUAN',
+            'RAISHA NUR ADELIA BINTI MOHD SYFUL NIZAM',
+            'ZAHRI RUSYAIDI BIN MOHD SHARIF',
+            'ZIYAD NURKHALAF BIN NORKHIZAIMI'
+        ];
+
+        function normalizeStudentName(value) {
+            return String(value || '')
+                .toUpperCase()
+                .replace(/[^A-Z0-9]+/g, ' ')
+                .replace(/\s+/g, ' ')
+                .trim();
+        }
+
+        function isOfficial4AlKhawarizmiStudent(student) {
+            const name = normalizeStudentName(student && student.nama);
+            return official4AlKhawarizmiNames.some(n => normalizeStudentName(n) === name);
+        }
+
+
         // Penapis roster kelas yang ketat.
-        // Nama murid diambil berdasarkan nama kelas sebenar dalam Supabase column `kelas`.
+        // Nama murid diambil berdasarkan kelas sebenar dan senarai rasmi 4 AL-KHAWARIZMI.
         // Tiada data markah atau PBD dipadam. Fungsi ini hanya mengawal paparan roster.
         function getStudentsByExactClass(kelasName) {
             const targetClass = canonicalClassName(kelasName);
+            const normalizedTarget = normalizeClassName(targetClass);
             const seen = new Set();
 
-            return students
-                .filter(s => isSameClassOnly(s.kelas, targetClass))
+            let roster = [];
+
+            if (normalizedTarget === normalizeClassName('4 AL-KHAWARIZMI')) {
+                // Paparan 4 AL-KHAWARIZMI dikunci kepada 23 nama rasmi.
+                // Ini mengelakkan murid 4 AR-RAZI masuk walaupun data kelas lama dalam Supabase pernah bercampur.
+                roster = students.filter(s => isOfficial4AlKhawarizmiStudent(s));
+            } else if (normalizedTarget === normalizeClassName('4 AR-RAZI')) {
+                // 4 AR-RAZI tidak mengambil 23 murid rasmi 4 AL-KHAWARIZMI.
+                roster = students.filter(s => isSameClassOnly(s.kelas, targetClass) && !isOfficial4AlKhawarizmiStudent(s));
+            } else {
+                roster = students.filter(s => isSameClassOnly(s.kelas, targetClass));
+            }
+
+            return roster
                 .filter(s => {
                     const key = String(s.ic || s.id || s.nama || '').trim().toUpperCase();
                     if (!key) return true;
