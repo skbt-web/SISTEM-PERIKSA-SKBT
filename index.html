@@ -456,8 +456,9 @@
 
 
         // Padanan kelas yang selamat.
-        // Tujuan: Tahun 4 AR-RAZI dan 4 AL-KHAWARIZMI tidak bergabung semasa pengisian markah.
-        // Data lama yang ada beza '-' atau jarak masih boleh dibaca.
+        // Tujuan: Setiap kelas diproses secara berasingan.
+        // Contoh: 4 AR-RAZI tidak bercampur dengan 4 AL-KHAWARIZMI.
+        // Data lama yang ada beza tanda '-' atau jarak masih boleh dibaca.
         function normalizeClassName(value) {
             return String(value || '')
                 .toUpperCase()
@@ -468,17 +469,42 @@
                 .trim();
         }
 
+        function getClassYearOnly(value) {
+            const match = normalizeClassName(value).match(/^(\d+)/);
+            return match ? match[1] : '';
+        }
+
+        function getClassStreamOnly(value) {
+            const normalized = normalizeClassName(value);
+
+            if (/(^|\s)AL\s+KHAWARIZMI($|\s)/.test(normalized)) {
+                return 'AL KHAWARIZMI';
+            }
+
+            if (/(^|\s)AR\s+RAZI($|\s)/.test(normalized)) {
+                return 'AR RAZI';
+            }
+
+            return '';
+        }
+
         function containsMultipleClasses(value) {
             const normalized = normalizeClassName(value);
-            const hasArRazi = /AR RAZI/.test(normalized);
-            const hasAlKhawarizmi = /AL KHAWARIZMI/.test(normalized);
-            return hasArRazi && hasAlKhawarizmi;
+            const hasAlKhawarizmi = /(^|\s)AL\s+KHAWARIZMI($|\s)/.test(normalized);
+            const hasArRazi = /(^|\s)AR\s+RAZI($|\s)/.test(normalized);
+            return hasAlKhawarizmi && hasArRazi;
         }
 
         function isSameClassOnly(value, targetClass) {
             if (!value || !targetClass) return false;
             if (containsMultipleClasses(value)) return false;
-            return normalizeClassName(value) === normalizeClassName(targetClass);
+
+            const valueYear = getClassYearOnly(value);
+            const targetYear = getClassYearOnly(targetClass);
+            const valueStream = getClassStreamOnly(value);
+            const targetStream = getClassStreamOnly(targetClass);
+
+            return valueYear === targetYear && valueStream !== '' && valueStream === targetStream;
         }
 
         function canonicalClassName(value) {
