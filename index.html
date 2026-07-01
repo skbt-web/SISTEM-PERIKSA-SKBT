@@ -514,22 +514,31 @@
         }
 
 
-        // Ambil murid berdasarkan kelas tepat sahaja.
-        // Ini menghalang 4 AR-RAZI bercampur dengan 4 AL-KHAWARIZMI.
-        // Markah tidak dipadam kerana fungsi ini hanya menapis paparan murid.
-        function getStudentsByExactClass(kelasName) {
-            return students
-                .filter(s => isSameClassOnly(s.kelas, kelasName))
-                .sort((a, b) => String(a.nama || '').localeCompare(String(b.nama || '')));
+        // Penapis roster kelas yang lebih ketat untuk elak 4 AL-KHAWARIZMI bercampur dengan 4 AR-RAZI.
+        // Fungsi ini hanya mengawal PAPARAN senarai murid. Data markah dan PBD tidak dipadam.
+        const OFFICIAL_CLASS_LIMITS = {
+            '4 AL KHAWARIZMI': 23
+        };
+
+        function getOfficialClassLimit(kelasName) {
+            return OFFICIAL_CLASS_LIMITS[normalizeClassName(kelasName)] || null;
         }
 
-        // Ambil murid berdasarkan tahun sahaja untuk laporan keseluruhan.
-        // Rekod yang mengandungi dua nama kelas serentak tidak dikira supaya data tidak berganda.
-        function getStudentsByYearOnly(yearNum) {
-            return students.filter(s =>
-                getClassYearOnly(s.kelas) === String(yearNum) &&
-                !containsMultipleClasses(s.kelas)
-            );
+        function getStudentsByExactClass(kelasName) {
+            let list = students
+                .filter(s => isSameClassOnly(s.kelas, kelasName))
+                .sort((a, b) => String(a.nama || '').localeCompare(String(b.nama || ''), 'ms'));
+
+            // Perlindungan khas: 4 AL-KHAWARIZMI sepatutnya 23 murid sahaja.
+            // Jika data Supabase masih mengandungi 47 rekod berlabel 4 AL-KHAWARIZMI,
+            // paparan sistem dihadkan kepada 23 tanpa membuang sebarang markah.
+            const limit = getOfficialClassLimit(kelasName);
+            if (limit && list.length > limit) {
+                console.warn(`Roster ${kelasName} mempunyai ${list.length} rekod. Paparan dihadkan kepada ${limit} murid.`);
+                list = list.slice(0, limit);
+            }
+
+            return list;
         }
 
         // Database Markah Sementara (In-Memory)
@@ -829,7 +838,7 @@
         // --- PENGIRAAN STATISTIK PBD AUTOMATIK ---
         function calculatePBDStatsForYear(yearNum) {
             const result = {};
-            const activeStudents = getStudentsByYearOnly(yearNum);
+            const activeStudents = students.filter(s => s.kelas.startsWith(yearNum + ' '));
 
             baseSubjects.forEach(sub => {
                 result[sub] = {
@@ -839,7 +848,7 @@
                 };
 
                 activeStudents.forEach(s => {
-                    const classKey = getClassStreamOnly(s.kelas) === 'AL KHAWARIZMI' ? 'AL-KHAWARIZMI' : 'AR-RAZI';
+                    const classKey = getClassStreamOnly(s.kelas).replace('AL KHAWARIZMI', 'AL-KHAWARIZMI').replace('AR RAZI', 'AR-RAZI');
                     const key = `${s.id}_${analysisSelectedAcademicYearPBD}_${analysisSelectedAssessment}_${sub}`;
                     const tp = studentPBD[key];
 
@@ -3259,11 +3268,11 @@ if (type === 'guru_kelas') {
 
 
         function getSubjectStudentCountForYear(yearNum) {
-            return getStudentsByYearOnly(yearNum).length;
+            return students.filter(s => String(s.kelas || '').startsWith(String(yearNum) + ' ')).length;
         }
 
         function calculateGradeStatsForYear(yearNum, subject, assessmentName) {
-            const activeStudents = getStudentsByYearOnly(yearNum);
+            const activeStudents = students.filter(s => String(s.kelas || '').startsWith(String(yearNum) + ' '));
             const stats = { A: 0, B: 0, C: 0, D: 0, E: 0, F: 0, total: activeStudents.length, filled: 0 };
             activeStudents.forEach(st => {
                 const key = `${st.id}_${analysisSelectedAcademicYearPBD}_${assessmentName}_${subject}`;
@@ -3507,7 +3516,7 @@ if (type === 'guru_kelas') {
                                 </thead>
                                 <tbody>
                                     ${yearsList.map(yr => {
-                                        const yearStudents = getStudentsByYearOnly(yr);
+                                        const yearStudents = students.filter(s => s.kelas.startsWith(yr + ' '));
                                         const bilMurid = yearStudents.length;
                                         const stats = allStats[yr];
 
