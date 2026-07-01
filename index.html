@@ -454,6 +454,39 @@
                 .trim();
         }
 
+
+        // Padanan kelas yang selamat.
+        // Tujuan: Tahun 4 AR-RAZI dan 4 AL-KHAWARIZMI tidak bergabung semasa pengisian markah.
+        // Data lama yang ada beza '-' atau jarak masih boleh dibaca.
+        function normalizeClassName(value) {
+            return String(value || '')
+                .toUpperCase()
+                .replace(/AL\s*-?\s*KHAWARIZMI/g, 'AL KHAWARIZMI')
+                .replace(/AR\s*-?\s*RAZI/g, 'AR RAZI')
+                .replace(/[^A-Z0-9]+/g, ' ')
+                .replace(/\s+/g, ' ')
+                .trim();
+        }
+
+        function containsMultipleClasses(value) {
+            const normalized = normalizeClassName(value);
+            const hasArRazi = /AR RAZI/.test(normalized);
+            const hasAlKhawarizmi = /AL KHAWARIZMI/.test(normalized);
+            return hasArRazi && hasAlKhawarizmi;
+        }
+
+        function isSameClassOnly(value, targetClass) {
+            if (!value || !targetClass) return false;
+            if (containsMultipleClasses(value)) return false;
+            return normalizeClassName(value) === normalizeClassName(targetClass);
+        }
+
+        function canonicalClassName(value) {
+            const normalized = normalizeClassName(value);
+            const match = classes.find(c => normalizeClassName(c) === normalized);
+            return match || String(value || '').toUpperCase().trim();
+        }
+
         // Database Markah Sementara (In-Memory)
         const studentMarks = {
             '14_2026_PENTAKSIRAN SUMATIF 1_BAHASA MELAYU': 85,
@@ -1265,7 +1298,7 @@ if (type === 'guru_kelas') {
             selectedYear = document.getElementById('sel-year').value;
             const newClass = document.getElementById('sel-class').value;
             const newClassYear = parseInt(newClass.charAt(0)) || 1;
-            selectedClass = newClass;
+            selectedClass = canonicalClassName(newClass);
             
             if (newClassYear < 4 && (selectedSubject === 'REKA BENTUK TEKNOLOGI' || selectedSubject === 'SEJARAH')) {
                 selectedSubject = 'BAHASA MELAYU';
@@ -1312,7 +1345,7 @@ if (type === 'guru_kelas') {
                                 value: num,
                                 teacher_email: currentUser ? currentUser.email : null,
                                 teacher_name: selectedTeacher,
-                                kelas: selectedClass,
+                                kelas: canonicalClassName(selectedClass),
                                 updated_at: new Date().toISOString()
                             });
                             successCount++;
@@ -1332,7 +1365,7 @@ if (type === 'guru_kelas') {
                                 value: pbdVal,
                                 teacher_email: currentUser ? currentUser.email : null,
                                 teacher_name: selectedTeacher,
-                                kelas: selectedClass,
+                                kelas: canonicalClassName(selectedClass),
                                 updated_at: new Date().toISOString()
                             });
                         } else {
@@ -1358,8 +1391,11 @@ if (type === 'guru_kelas') {
         }
 
         async function hantarKeGuruKelas() {
+            selectedClass = canonicalClassName(selectedClass);
             await saveMarks(true);
-            showToast(`Kesemua data pentaksiran kelas [${selectedClass}] bagi subjek [${selectedSubject}] telah dihantar secara rasmi ke Dashboard Guru Kelas & Supabase!`, 'success');
+            await fetchAllDataFromSupabase();
+            showToast(`Data ${selectedSubject} kelas ${selectedClass} telah dihantar. Rekod akan muncul di Dashboard Guru Kelas dan Dashboard Admin mengikut kelas, guru, subjek dan pentaksiran.`, 'success');
+            renderPage();
         }
 
         // --- CSV LOADING AND PROCESSING ---
@@ -1378,7 +1414,7 @@ if (type === 'guru_kelas') {
                     if (columns.length >= 3) {
                         const nama = columns[0].trim().toUpperCase();
                         const ic = columns[1].trim();
-                        const kelas = columns[2].trim().toUpperCase();
+                        const kelas = canonicalClassName(columns[2].trim());
 
                         if (nama && ic && kelas) {
                             tempUploadedStudents.push({ nama, ic, kelas });
@@ -1445,7 +1481,7 @@ if (type === 'guru_kelas') {
 
             const nama = namaInput.value.trim().toUpperCase();
             const ic = icInput.value.trim();
-            const kelas = kelasSelect.value;
+            const kelas = canonicalClassName(kelasSelect.value);
 
             if (!nama || !ic || !kelas) {
                 showToast('Sila isikan semua butiran pendaftaran murid.', 'warning');
@@ -1496,26 +1532,33 @@ if (type === 'guru_kelas') {
 
         // --- STATUS PENGISIAN GURU / ADMIN ---
         function getClassStudentCount(kelasName) {
-            return students.filter(s => s.kelas === kelasName).length;
+            return students.filter(s => isSameClassOnly(s.kelas, kelasName)).length;
         }
 
         function buildFillingStatusRows(scope = 'admin', classFilter = null) {
             const grouped = {};
-            const filteredRows = (markStatusRows || []).filter(row => {
+            const allRows = [
+                ...(markStatusRows || []).map(row => ({ ...row, data_type: 'MARKAH' })),
+                ...(pbdStatusRows || []).map(row => ({ ...row, data_type: 'PBD' }))
+            ];
+
+            const filteredRows = allRows.filter(row => {
                 if (!row) return false;
                 if (selectedYear && String(row.tahun) !== String(selectedYear)) return false;
                 if (selectedAssessment && row.assessment !== selectedAssessment) return false;
-                if (classFilter && row.kelas !== classFilter) return false;
+                if (classFilter && !isSameClassOnly(row.kelas, classFilter)) return false;
+                if (containsMultipleClasses(row.kelas)) return false;
                 return true;
             });
 
             filteredRows.forEach(row => {
-                const kelasName = row.kelas || '-';
+                const kelasName = canonicalClassName(row.kelas || '-');
                 const subjectName = row.subject || '-';
                 const teacherName = row.teacher_name || row.teacher_email || '-';
+                const teacherEmail = cleanEmail(row.teacher_email || '');
                 const assessmentName = row.assessment || '-';
                 const tahunName = row.tahun || selectedYear;
-                const key = [tahunName, assessmentName, kelasName, subjectName, teacherName].join('||');
+                const key = [tahunName, assessmentName, normalizeClassName(kelasName), subjectName, teacherEmail || normalizeTeacherName(teacherName)].join('||');
 
                 if (!grouped[key]) {
                     grouped[key] = {
@@ -1525,25 +1568,35 @@ if (type === 'guru_kelas') {
                         subject: subjectName,
                         teacher_name: teacherName,
                         teacher_email: row.teacher_email || '-',
-                        studentIds: new Set(),
-                        updated_at: row.updated_at || null
+                        markStudentIds: new Set(),
+                        pbdStudentIds: new Set(),
+                        allStudentIds: new Set(),
+                        updated_at: row.updated_at || row.tarikh || null
                     };
                 }
 
-                if (row.student_id) grouped[key].studentIds.add(String(row.student_id));
-                if (row.updated_at && (!grouped[key].updated_at || new Date(row.updated_at) > new Date(grouped[key].updated_at))) {
-                    grouped[key].updated_at = row.updated_at;
+                if (row.student_id) {
+                    grouped[key].allStudentIds.add(String(row.student_id));
+                    if (row.data_type === 'MARKAH') grouped[key].markStudentIds.add(String(row.student_id));
+                    if (row.data_type === 'PBD') grouped[key].pbdStudentIds.add(String(row.student_id));
+                }
+
+                const rowDate = row.updated_at || row.tarikh || null;
+                if (rowDate && (!grouped[key].updated_at || new Date(rowDate) > new Date(grouped[key].updated_at))) {
+                    grouped[key].updated_at = rowDate;
                 }
             });
 
             const result = Object.values(grouped).map(item => {
                 const total = getClassStudentCount(item.kelas);
-                const completed = item.studentIds.size;
+                const markCompleted = item.markStudentIds.size;
+                const pbdCompleted = item.pbdStudentIds.size;
+                const completed = item.allStudentIds.size;
                 const percent = total > 0 ? Math.round((completed / total) * 100) : 0;
                 let status = 'BELUM MULA';
                 if (completed > 0 && completed < total) status = 'SEBAHAGIAN';
                 if (total > 0 && completed >= total) status = 'SIAP';
-                return { ...item, total, completed, percent, status };
+                return { ...item, total, completed, markCompleted, pbdCompleted, percent, status };
             });
 
             return result.sort((a, b) => {
@@ -1977,7 +2030,7 @@ if (type === 'guru_kelas') {
 
         function getSlipClassRank(student) {
             if (!student) return '-';
-            const classmates = students.filter(s => s.kelas === student.kelas);
+            const classmates = students.filter(s => isSameClassOnly(s.kelas, student.kelas));
             const scores = classmates.map(s => ({ id: s.id, total: getStudentTotalForSlip(s).total }))
                 .sort((a, b) => b.total - a.total);
             const index = scores.findIndex(s => String(s.id) === String(student.id));
@@ -2461,7 +2514,7 @@ if (type === 'guru_kelas') {
 
         function getVerificationForClass(kelasName, jenis) {
             return (classVerificationRows || []).find(row =>
-                row.kelas === kelasName &&
+                isSameClassOnly(row.kelas, kelasName) &&
                 String(row.tahun) === String(selectedYear) &&
                 row.assessment === selectedAssessment &&
                 row.jenis === jenis
@@ -2469,7 +2522,7 @@ if (type === 'guru_kelas') {
         }
 
         function getClassCompletionSummary(kelasName) {
-            const classStudents = students.filter(s => s.kelas === kelasName);
+            const classStudents = students.filter(s => isSameClassOnly(s.kelas, kelasName));
             const totalStudents = classStudents.length;
             const subjectList = getSubjectsForClass(kelasName);
             let completedSubjects = 0;
@@ -2477,8 +2530,9 @@ if (type === 'guru_kelas') {
             let totalFilled = 0;
 
             subjectList.forEach(sub => {
-                const filled = new Set((markStatusRows || []).filter(row =>
-                    row.kelas === kelasName &&
+                const combinedRows = [ ...(markStatusRows || []), ...(pbdStatusRows || []) ];
+                const filled = new Set(combinedRows.filter(row =>
+                    isSameClassOnly(row.kelas, kelasName) &&
                     row.subject === sub &&
                     row.assessment === selectedAssessment &&
                     String(row.tahun) === String(selectedYear)
@@ -2892,7 +2946,7 @@ if (type === 'guru_kelas') {
             else if (currentPage === 'pengisian_markah') {
                 const classYearNum = parseInt(selectedClass.charAt(0)) || 1;
                 const subjectsToUse = baseSubjects;
-                const activeStudents = students.filter(s => s.kelas === selectedClass);
+                const activeStudents = students.filter(s => isSameClassOnly(s.kelas, selectedClass));
 
                 content.innerHTML = `
                     <div class="space-y-6">
@@ -2937,6 +2991,7 @@ if (type === 'guru_kelas') {
                                     <span class="w-2.5 h-2.5 rounded-full bg-blue-500"></span>
                                     Prestasi Murid: ${selectedClass} (${activeStudents.length} Murid)
                                 </h3>
+                                ${activeStudents.length === 0 && String(selectedClass).startsWith('4 ') ? `<span class="text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-100 px-3 py-1 rounded-full">Jika murid Tahun 4 kosong, semak data murid supaya kelas tidak digabungkan.</span>` : ''}
                                 <div class="flex items-center gap-2">
                                     <button onclick="toggleEditMode()" class="px-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-700 hover:bg-slate-50 transition-all flex items-center gap-1">
                                         <i data-lucide="${isEditMode ? 'lock' : 'unlock'}" class="w-3.5 h-3.5"></i> ${isEditMode ? 'Kunci Mod' : 'Kemaskini'}
@@ -3086,7 +3141,7 @@ if (type === 'guru_kelas') {
                     `;
                 } else {
                     const assignedClass = guruKelasSelectedClass;
-                    const classStudents = students.filter(s => s.kelas === assignedClass);
+                    const classStudents = students.filter(s => isSameClassOnly(s.kelas, assignedClass));
 
                     content.innerHTML = `
                         <div class="space-y-6">
