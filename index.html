@@ -738,11 +738,9 @@
                     .select('key,value,student_id,tahun,assessment,subject,teacher_email,teacher_name,kelas,updated_at');
                 if (markError) throw markError;
                 if (markRows) {
-                    markStatusRows = markRows;
-                    Object.keys(studentMarks).forEach(k => delete studentMarks[k]);
-                    markRows.forEach(row => {
-                        if (row.key) studentMarks[row.key] = row.value;
-                    });
+                    const cachedMarks = readCachedAssessmentRows(SISMAR_MARK_CACHE_KEY, 'MARKAH');
+                    markStatusRows = mergeAssessmentRows(markRows, cachedMarks, 'MARKAH');
+                    cacheAssessmentRows(SISMAR_MARK_CACHE_KEY, markStatusRows);
                 }
 
                 const { data: pbdRows, error: pbdError } = await supabaseClient
@@ -750,12 +748,12 @@
                     .select('key,value,student_id,tahun,assessment,subject,teacher_email,teacher_name,kelas,updated_at');
                 if (pbdError) throw pbdError;
                 if (pbdRows) {
-                    pbdStatusRows = pbdRows;
-                    Object.keys(studentPBD).forEach(k => delete studentPBD[k]);
-                    pbdRows.forEach(row => {
-                        if (row.key) studentPBD[row.key] = row.value;
-                    });
+                    const cachedPbd = readCachedAssessmentRows(SISMAR_PBD_CACHE_KEY, 'PBD');
+                    pbdStatusRows = mergeAssessmentRows(pbdRows, cachedPbd, 'PBD');
+                    cacheAssessmentRows(SISMAR_PBD_CACHE_KEY, pbdStatusRows);
                 }
+
+                rebuildAssessmentMaps();
 
                 // Direktori guru untuk pembetulan Admin. Emel digunakan secara dalaman sahaja dan tidak dipaparkan.
                 try {
@@ -863,23 +861,27 @@
         }
 
         async function persistMarksBulkToSupabase(markRows, pbdRows) {
-            if (!supabaseEnabled || !supabaseClient) return;
+            if (!supabaseEnabled || !supabaseClient) return false;
             try {
                 if (markRows.length > 0) {
                     const { error } = await supabaseClient
                         .from('marks')
                         .upsert(markRows, { onConflict: 'student_id,tahun,assessment,subject' });
                     if (error) throw error;
+                    cacheAssessmentRows(SISMAR_MARK_CACHE_KEY, markRows);
                 }
                 if (pbdRows.length > 0) {
                     const { error } = await supabaseClient
                         .from('pbd')
                         .upsert(pbdRows, { onConflict: 'student_id,tahun,assessment,subject' });
                     if (error) throw error;
+                    cacheAssessmentRows(SISMAR_PBD_CACHE_KEY, pbdRows);
                 }
+                return true;
             } catch (e) {
                 console.error('Failed to save marks / pbd:', e);
-                showToast('Gagal simpan markah ke Supabase.', 'danger');
+                showToast('Gagal simpan markah ke Supabase. Markah pada skrin dikekalkan, sila semak RLS / unique key.', 'danger');
+                return false;
             }
         }
 
@@ -1477,11 +1479,21 @@ if (type === 'guru_kelas') {
                 }
             }
 
-            await persistMarksBulkToSupabase(markRows, pbdRows);
-            await fetchAllDataFromSupabase();
+            // Kemas kini status tempatan dahulu supaya Dashboard Guru Kelas terus nampak markah
+            // walaupun Supabase lambat refresh atau RLS tidak memulangkan row kepada akaun semasa.
+            markStatusRows = mergeAssessmentRows(markStatusRows, markRows, 'MARKAH');
+            pbdStatusRows = mergeAssessmentRows(pbdStatusRows, pbdRows, 'PBD');
+            cacheAssessmentRows(SISMAR_MARK_CACHE_KEY, markStatusRows);
+            cacheAssessmentRows(SISMAR_PBD_CACHE_KEY, pbdStatusRows);
+            rebuildAssessmentMaps();
+
+            const saved = await persistMarksBulkToSupabase(markRows, pbdRows);
+            if (saved) {
+                await fetchAllDataFromSupabase();
+            }
 
             if (!silent) {
-                showToast(`Selesai menyimpan ${successCount} rekod prestasi ke Supabase.`, 'success');
+                showToast(`Selesai menyimpan ${successCount} rekod prestasi. Markah dipulihkan dalam paparan Dashboard Guru Kelas.`, 'success');
             }
             renderPage();
         }
@@ -1693,11 +1705,11 @@ if (type === 'guru_kelas') {
                 const total = getClassStudentCount(item.kelas);
                 const markCompleted = item.markStudentIds.size;
                 const pbdCompleted = item.pbdStudentIds.size;
-                const completed = item.allStudentIds.size;
+                const completed = Math.min(markCompleted, pbdCompleted);
                 const percent = total > 0 ? Math.round((completed / total) * 100) : 0;
                 let status = 'BELUM MULA';
-                if (completed > 0 && completed < total) status = 'SEBAHAGIAN';
-                if (total > 0 && completed >= total) status = 'SIAP';
+                if ((markCompleted > 0 || pbdCompleted > 0) && completed < total) status = 'SEBAHAGIAN';
+                if (total > 0 && markCompleted >= total && pbdCompleted >= total) status = 'SIAP';
                 return { ...item, total, completed, markCompleted, pbdCompleted, percent, status };
             });
 
@@ -1927,6 +1939,132 @@ if (type === 'guru_kelas') {
             }
         }
 
+        function getAssessmentMarkValue(studentId, tahun, assessment, subject) {
+            const key = makeAssessmentKey(studentId, tahun, assessment, subject);
+            if (studentMarks[key] !== undefined && studentMarks[key] !== null && studentMarks[key] !== '') {
+                return studentMarks[key];
+            }
+
+            const row = (markStatusRows || []).find(r =>
+                String(r.student_id) === String(studentId) &&
+                String(r.tahun) === String(tahun) &&
+                String(r.assessment) === String(assessment) &&
+                String(r.subject) === String(subject) &&
+                r.value !== null && r.value !== undefined && r.value !== ''
+            );
+
+            return row ? row.value : '';
+        }
+
+        function getAssessmentPBDValue(studentId, tahun, assessment, subject) {
+            const key = makeAssessmentKey(studentId, tahun, assessment, subject);
+            if (studentPBD[key] !== undefined && studentPBD[key] !== null && studentPBD[key] !== '') {
+                return studentPBD[key];
+            }
+
+            const row = (pbdStatusRows || []).find(r =>
+                String(r.student_id) === String(studentId) &&
+                String(r.tahun) === String(tahun) &&
+                String(r.assessment) === String(assessment) &&
+                String(r.subject) === String(subject) &&
+                r.value !== null && r.value !== undefined && r.value !== ''
+            );
+
+            return row ? row.value : '';
+        }
+
+        function escapeHtml(value) {
+            return String(value ?? '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
+
+        function renderDetailedMarksPanel(scope = 'admin', classFilter = null) {
+            const activeClass = canonicalClassName(classFilter || selectedClass || classes[0]);
+            const activeSubject = selectedSubject || baseSubjects[0];
+            const activeYear = selectedYear || years[0];
+            const activeAssessment = selectedAssessment || assessments[0];
+            const classStudents = getStudentsByExactClass(activeClass);
+            const rows = classStudents.map((student, index) => {
+                const mark = getAssessmentMarkValue(student.id, activeYear, activeAssessment, activeSubject);
+                const pbd = getAssessmentPBDValue(student.id, activeYear, activeAssessment, activeSubject);
+                const gradeInfo = mark !== '' ? calculateUASAGrade(mark) : null;
+                return { student, index, mark, pbd, grade: gradeInfo ? gradeInfo.grade : '-' };
+            });
+            const filledMarks = rows.filter(r => r.mark !== '').length;
+            const filledPbd = rows.filter(r => r.pbd !== '').length;
+            const total = rows.length;
+            const markPercent = total > 0 ? Math.round((filledMarks / total) * 100) : 0;
+
+            return `
+                <div class="bg-white rounded-2xl border border-emerald-100 shadow-sm overflow-hidden">
+                    <div class="p-5 border-b border-emerald-50 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
+                        <div>
+                            <h3 class="font-black text-slate-800 text-sm flex items-center gap-2">
+                                <i data-lucide="table-2" class="w-5 h-5 text-emerald-600"></i>
+                                Perincian Markah Murid
+                            </h3>
+                            <p class="text-[11px] text-slate-500 font-semibold mt-1">Paparan ini membaca markah sebenar daripada data marks, cache pemulihan dan peta studentMarks yang sama.</p>
+                        </div>
+                        <div class="flex flex-wrap items-center gap-2 no-print">
+                            ${scope === 'admin' ? `
+                                <select onchange="selectedClass=this.value; renderPage()" class="p-2 border border-slate-200 rounded-xl text-xs font-bold outline-none">
+                                    ${classes.map(c => `<option value="${escapeHtml(c)}" ${normalizeClassName(activeClass)===normalizeClassName(c)?'selected':''}>${escapeHtml(c)}</option>`).join('')}
+                                </select>
+                            ` : `<span class="px-3 py-2 bg-purple-50 text-purple-700 rounded-xl text-xs font-black">${escapeHtml(activeClass)}</span>`}
+                            <select onchange="selectedSubject=this.value; renderPage()" class="p-2 border border-slate-200 rounded-xl text-xs font-bold outline-none">
+                                ${baseSubjects.map(sub => `<option value="${escapeHtml(sub)}" ${activeSubject===sub?'selected':''}>${escapeHtml(sub)}</option>`).join('')}
+                            </select>
+                            <button onclick="fetchAllDataFromSupabase().then(()=>{rebuildAssessmentMaps(); showToast('Markah telah disegerakkan.', 'success'); renderPage();})" class="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5">
+                                <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i> Segar Markah
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-3 p-5 bg-emerald-50/30 border-b border-slate-100">
+                        <div class="bg-white p-4 rounded-2xl border border-slate-100"><p class="text-[10px] font-bold text-slate-400 uppercase">Kelas</p><h4 class="text-sm font-black text-slate-800">${escapeHtml(activeClass)}</h4></div>
+                        <div class="bg-white p-4 rounded-2xl border border-slate-100"><p class="text-[10px] font-bold text-slate-400 uppercase">Markah Diisi</p><h4 class="text-xl font-black text-emerald-700">${filledMarks}/${total}</h4></div>
+                        <div class="bg-white p-4 rounded-2xl border border-slate-100"><p class="text-[10px] font-bold text-slate-400 uppercase">PBD Diisi</p><h4 class="text-xl font-black text-blue-700">${filledPbd}/${total}</h4></div>
+                        <div class="bg-white p-4 rounded-2xl border border-slate-100"><p class="text-[10px] font-bold text-slate-400 uppercase">Peratus Markah</p><h4 class="text-xl font-black text-purple-700">${markPercent}%</h4></div>
+                    </div>
+
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse text-xs">
+                            <thead>
+                                <tr class="bg-white border-b border-slate-100 text-[10px] font-black text-slate-400 uppercase tracking-wider">
+                                    <th class="p-4 text-center">Bil</th>
+                                    <th class="p-4">Nama Murid</th>
+                                    <th class="p-4">Kelas</th>
+                                    <th class="p-4">Subjek</th>
+                                    <th class="p-4 text-center">Markah</th>
+                                    <th class="p-4 text-center">Gred</th>
+                                    <th class="p-4 text-center">PBD</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-50">
+                                ${rows.length === 0 ? `
+                                    <tr><td colspan="7" class="p-6 text-center text-slate-400 font-bold">Tiada murid untuk kelas ini.</td></tr>
+                                ` : rows.map(r => `
+                                    <tr class="hover:bg-slate-50/60">
+                                        <td class="p-4 text-center font-black text-slate-500">${r.index + 1}</td>
+                                        <td class="p-4 font-bold text-slate-800">${escapeHtml(r.student.nama)}</td>
+                                        <td class="p-4"><span class="bg-emerald-50 text-emerald-700 text-[10px] px-2.5 py-1 rounded-full font-black">${escapeHtml(activeClass)}</span></td>
+                                        <td class="p-4 font-semibold text-slate-600">${escapeHtml(activeSubject)}</td>
+                                        <td class="p-4 text-center font-black ${r.mark === '' ? 'text-slate-300' : 'text-slate-800'}">${r.mark === '' ? '-' : escapeHtml(r.mark)}</td>
+                                        <td class="p-4 text-center font-black ${r.grade === '-' ? 'text-slate-300' : 'text-blue-700'}">${escapeHtml(r.grade)}</td>
+                                        <td class="p-4 text-center font-black ${r.pbd === '' ? 'text-slate-300' : 'text-purple-700'}">${r.pbd === '' ? '-' : escapeHtml(r.pbd)}</td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            `;
+        }
+
         function renderFillingStatusPanel(scope = 'admin', classFilter = null) {
             const rows = buildFillingStatusRows(scope, classFilter);
             const totalTasks = rows.length;
@@ -1951,7 +2089,7 @@ if (type === 'guru_kelas') {
                             <select onchange="selectedAssessment=this.value; renderPage()" class="p-2 border border-slate-200 rounded-xl text-xs font-bold outline-none">
                                 ${assessments.map(a => `<option value="${a}" ${selectedAssessment===a?'selected':''}>${a}</option>`).join('')}
                             </select>
-                            <button onclick="fetchAllDataFromSupabase().then(()=>{showToast('Status telah disegerakkan.', 'success'); renderPage();})" class="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5">
+                            <button onclick="fetchAllDataFromSupabase().then(()=>{rebuildAssessmentMaps(); showToast('Status telah disegerakkan.', 'success'); renderPage();})" class="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5">
                                 <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i> Segar
                             </button>
                         </div>
@@ -1984,7 +2122,8 @@ if (type === 'guru_kelas') {
                                     <th class="p-4">Kelas</th>
                                     <th class="p-4">Subjek</th>
                                     <th class="p-4">Pentaksiran</th>
-                                    <th class="p-4 text-center">Diisi</th>
+                                    <th class="p-4 text-center">Markah</th>
+                                    <th class="p-4 text-center">PBD</th>
                                     <th class="p-4 text-center">%</th>
                                     <th class="p-4">Kemaskini</th>
                                     <th class="p-4 text-center">Status</th>
@@ -1993,14 +2132,15 @@ if (type === 'guru_kelas') {
                             </thead>
                             <tbody class="divide-y divide-slate-50">
                                 ${rows.length === 0 ? `
-                                    <tr><td colspan="9" class="p-6 text-center text-slate-400 font-bold">Belum ada data pengisian untuk pilihan ini.</td></tr>
+                                    <tr><td colspan="10" class="p-6 text-center text-slate-400 font-bold">Belum ada data pengisian untuk pilihan ini.</td></tr>
                                 ` : rows.map(r => `
                                     <tr class="hover:bg-slate-50/60">
                                         <td class="p-4 font-bold text-slate-800">${r.teacher_name}</td>
                                         <td class="p-4"><span class="bg-blue-50 text-blue-700 text-[10px] px-2.5 py-1 rounded-full font-black">${r.kelas}</span></td>
                                         <td class="p-4 font-semibold text-slate-600">${r.subject}</td>
                                         <td class="p-4 text-slate-500 font-semibold">${r.assessment}</td>
-                                        <td class="p-4 text-center font-black text-slate-700">${r.completed}/${r.total}</td>
+                                        <td class="p-4 text-center font-black text-slate-700">${r.markCompleted}/${r.total}</td>
+                                        <td class="p-4 text-center font-black text-slate-700">${r.pbdCompleted}/${r.total}</td>
                                         <td class="p-4 text-center font-black text-slate-700">${r.percent}%</td>
                                         <td class="p-4 text-slate-500 font-semibold">${formatDateTimeMY(r.updated_at)}</td>
                                         <td class="p-4 text-center">${renderStatusBadge(r.status)}</td>
@@ -2581,6 +2721,96 @@ if (type === 'guru_kelas') {
             return cleanEmail(value);
         }
 
+        // --- PEMULIHAN MARKAH SISMAR ---
+        // Cache ini tidak mengubah struktur asal. Ia hanya melindungi markah yang sudah diisi
+        // daripada hilang pada paparan Dashboard Guru Kelas jika bacaan Supabase lambat, RLS terhad,
+        // atau column key lama kosong.
+        const SISMAR_MARK_CACHE_KEY = 'sismar_mark_rows_cache_v1';
+        const SISMAR_PBD_CACHE_KEY = 'sismar_pbd_rows_cache_v1';
+
+        function makeAssessmentKey(studentId, tahun, assessment, subject) {
+            return `${studentId}_${tahun}_${assessment}_${subject}`;
+        }
+
+        function normalizeSavedRow(row, type = 'MARKAH') {
+            if (!row) return null;
+            const parsed = row.key ? parseKey(row.key) : {};
+            const studentId = String(row.student_id || parsed.student_id || '').trim();
+            const tahun = String(row.tahun || parsed.tahun || selectedYear || '').trim();
+            const assessment = row.assessment || parsed.assessment || selectedAssessment || '';
+            const subject = row.subject || parsed.subject || selectedSubject || '';
+            if (!studentId || !tahun || !assessment || !subject) return null;
+            return {
+                ...row,
+                key: row.key || makeAssessmentKey(studentId, tahun, assessment, subject),
+                student_id: studentId,
+                tahun,
+                assessment,
+                subject,
+                value: row.value,
+                teacher_email: row.teacher_email || (currentUser ? currentUser.email : null),
+                teacher_name: row.teacher_name || selectedTeacher || '-',
+                kelas: canonicalClassName(row.kelas || selectedClass || ''),
+                updated_at: row.updated_at || new Date().toISOString(),
+                data_type: type
+            };
+        }
+
+        function cacheAssessmentRows(storageKey, rows) {
+            try {
+                const existing = JSON.parse(localStorage.getItem(storageKey) || '[]');
+                const merged = {};
+                existing.concat(rows || []).forEach(item => {
+                    const row = normalizeSavedRow(item, storageKey === SISMAR_MARK_CACHE_KEY ? 'MARKAH' : 'PBD');
+                    if (!row) return;
+                    const k = [row.student_id, row.tahun, row.assessment, row.subject].join('||');
+                    merged[k] = row;
+                });
+                localStorage.setItem(storageKey, JSON.stringify(Object.values(merged)));
+            } catch (e) {
+                console.warn('Cache markah tidak dapat dikemas kini:', e);
+            }
+        }
+
+        function readCachedAssessmentRows(storageKey, type = 'MARKAH') {
+            try {
+                return (JSON.parse(localStorage.getItem(storageKey) || '[]') || [])
+                    .map(row => normalizeSavedRow(row, type))
+                    .filter(Boolean);
+            } catch (e) {
+                return [];
+            }
+        }
+
+        function mergeAssessmentRows(primaryRows, cachedRows, type = 'MARKAH') {
+            const merged = {};
+            (cachedRows || []).concat(primaryRows || []).forEach(item => {
+                const row = normalizeSavedRow(item, type);
+                if (!row) return;
+                const k = [row.student_id, row.tahun, row.assessment, row.subject].join('||');
+                merged[k] = row;
+            });
+            return Object.values(merged);
+        }
+
+        function rebuildAssessmentMaps() {
+            Object.keys(studentMarks).forEach(k => delete studentMarks[k]);
+            (markStatusRows || []).forEach(row => {
+                const fixed = normalizeSavedRow(row, 'MARKAH');
+                if (fixed && fixed.key && fixed.value !== null && fixed.value !== undefined && fixed.value !== '') {
+                    studentMarks[fixed.key] = fixed.value;
+                }
+            });
+
+            Object.keys(studentPBD).forEach(k => delete studentPBD[k]);
+            (pbdStatusRows || []).forEach(row => {
+                const fixed = normalizeSavedRow(row, 'PBD');
+                if (fixed && fixed.key && fixed.value !== null && fixed.value !== undefined && fixed.value !== '') {
+                    studentPBD[fixed.key] = fixed.value;
+                }
+            });
+        }
+
         function getAllowedGuruKelasClasses() {
             const currentEmail = normalizeEmail(currentUser?.email || '');
 
@@ -2944,6 +3174,7 @@ if (type === 'guru_kelas') {
                         </div>
 
                         ${isAdmin ? renderFillingStatusPanel('admin') : ''}
+                        ${isAdmin ? renderDetailedMarksPanel('admin') : ''}
                         ${isAdmin ? renderAdminClassVerificationPanel() : ''}
                         ${(!isAdmin && currentUser?.role === 'Guru') ? renderTeacherOwnStatusPanel() : ''}
                     </div>
@@ -3262,6 +3493,8 @@ if (type === 'guru_kelas') {
                             ${renderGuruKelasOfficialFlow(assignedClass)}
 
                             ${renderFillingStatusPanel('guru_kelas', assignedClass)}
+
+                            ${renderDetailedMarksPanel('guru_kelas', assignedClass)}
 
                             <div class="bg-white p-6 rounded-2xl border border-blue-100 shadow-sm space-y-4">
                                 <h3 class="font-bold text-gray-800 text-sm flex items-center gap-1.5"><i data-lucide="users" class="w-5 h-5 text-purple-600"></i> Senarai Roster Kelas (${classStudents.length} Murid)</h3>
