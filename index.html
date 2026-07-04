@@ -1225,6 +1225,11 @@ if (type === 'guru_kelas') {
             }
 
             html += `
+            <button onclick="navigate('sismar_ai')" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all" data-page="sismar_ai">
+                <i data-lucide="brain-circuit"></i><span>SISMAR AI</span>
+            </button>`;
+
+            html += `
             <button onclick="navigate('settings')" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all" data-page="settings">
                 <i data-lucide="settings"></i><span>Tetapan</span>
             </button>`;
@@ -2533,6 +2538,7 @@ if (type === 'guru_kelas') {
             a.download = `Status_Pengisian_${(currentUser?.name || 'Guru').replace(/\s+/g,'_')}.csv`;
             a.click();
             URL.revokeObjectURL(url);
+            showToast('Status pengisian guru berjaya dieksport ke CSV.', 'success');
         }
 
         function exportTeacherStatusExcel() {
@@ -2653,7 +2659,7 @@ if (type === 'guru_kelas') {
                                 <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i> Segar
                             </button>
                             <button onclick="exportTeacherStatusCSV()" class="px-3 py-2 bg-cyan-600 hover:bg-cyan-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5">
-                                <i data-lucide="file-text" class="w-3.5 h-3.5"></i> CSV
+                                <i data-lucide="file-text" class="w-3.5 h-3.5"></i> Export CSV
                             </button>
                             <button onclick="exportTeacherStatusExcel()" class="px-3 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs font-bold flex items-center gap-1.5">
                                 <i data-lucide="file-spreadsheet" class="w-3.5 h-3.5"></i> Excel
@@ -3094,6 +3100,285 @@ if (type === 'guru_kelas') {
             `;
         }
 
+
+        // --- SISMAR AI ENGINE ---
+        // Struktur asal dikekalkan. Modul ini hanya membaca data sedia ada dan memaparkan analisis.
+        let sismarAISelectedMode = 'sekolah';
+        let sismarAIResult = '';
+
+        function getStudentSubjectMarks(studentId, year = selectedYear, assessment = selectedAssessment) {
+            return baseSubjects.map(subject => {
+                const key = `${studentId}_${year}_${assessment}_${subject}`;
+                const mark = studentMarks[key];
+                const pbd = studentPBD[key] || '';
+                return {
+                    subject,
+                    mark: mark === undefined || mark === '' ? null : Number(mark),
+                    pbd
+                };
+            });
+        }
+
+        function getStudentAverageAI(studentId, year = selectedYear, assessment = selectedAssessment) {
+            const marks = getStudentSubjectMarks(studentId, year, assessment).filter(item => Number.isFinite(item.mark));
+            if (marks.length === 0) return 0;
+            return marks.reduce((sum, item) => sum + item.mark, 0) / marks.length;
+        }
+
+        function getStudentRiskAI(student, year = selectedYear, assessment = selectedAssessment) {
+            const average = getStudentAverageAI(student.id, year, assessment);
+            const subjectRows = getStudentSubjectMarks(student.id, year, assessment);
+            const lowSubjects = subjectRows.filter(item => Number.isFinite(item.mark) && item.mark < 40).map(item => item.subject);
+            const lowTP = subjectRows.filter(item => ['TP1', 'TP2'].includes(item.pbd)).map(item => item.subject);
+
+            if (average > 0 && (average < 40 || lowSubjects.length >= 2 || lowTP.length >= 2)) {
+                return {
+                    tahap: 'Risiko Tinggi',
+                    badge: 'bg-rose-100 text-rose-700 border-rose-200',
+                    cadangan: 'Intervensi segera, bimbingan kumpulan kecil dan pemantauan mingguan.',
+                    sebab: lowSubjects.length ? `Markah rendah dalam ${lowSubjects.slice(0, 3).join(', ')}.` : 'Tahap penguasaan masih rendah.'
+                };
+            }
+
+            if (average > 0 && (average < 60 || lowSubjects.length === 1 || lowTP.length === 1)) {
+                return {
+                    tahap: 'Risiko Sederhana',
+                    badge: 'bg-amber-100 text-amber-700 border-amber-200',
+                    cadangan: 'Latihan pengukuhan, semakan latihan dan ujian semula selepas dua minggu.',
+                    sebab: lowSubjects.length ? `Perlu pengukuhan dalam ${lowSubjects.slice(0, 3).join(', ')}.` : 'Prestasi belum stabil.'
+                };
+            }
+
+            return {
+                tahap: average === 0 ? 'Belum Cukup Data' : 'Risiko Rendah',
+                badge: average === 0 ? 'bg-slate-100 text-slate-600 border-slate-200' : 'bg-emerald-100 text-emerald-700 border-emerald-200',
+                cadangan: average === 0 ? 'Lengkapkan markah dan TP sebelum analisis penuh dibuat.' : 'Teruskan latihan pengayaan dan soalan aras tinggi.',
+                sebab: average === 0 ? 'Data markah belum mencukupi.' : 'Prestasi stabil.'
+            };
+        }
+
+        function getSismarAISnapshot() {
+            const rows = students.map(s => {
+                const average = getStudentAverageAI(s.id);
+                const risk = getStudentRiskAI(s);
+                return {
+                    id: s.id,
+                    nama: s.nama,
+                    kelas: s.kelas,
+                    purata: Number(average.toFixed(1)),
+                    risiko: risk.tahap,
+                    sebab: risk.sebab,
+                    cadangan: risk.cadangan,
+                    subjects: getStudentSubjectMarks(s.id).filter(item => item.mark !== null || item.pbd)
+                };
+            });
+
+            const withMarks = rows.filter(r => r.purata > 0);
+            const schoolAverage = withMarks.length ? withMarks.reduce((sum, r) => sum + r.purata, 0) / withMarks.length : 0;
+            const highRisk = rows.filter(r => r.risiko === 'Risiko Tinggi');
+            const mediumRisk = rows.filter(r => r.risiko === 'Risiko Sederhana');
+            const lowRisk = rows.filter(r => r.risiko === 'Risiko Rendah');
+
+            const subjectStats = baseSubjects.map(subject => {
+                const values = students.map(s => {
+                    const key = `${s.id}_${selectedYear}_${selectedAssessment}_${subject}`;
+                    const mark = studentMarks[key];
+                    return mark === undefined || mark === '' ? null : Number(mark);
+                }).filter(v => Number.isFinite(v));
+                const avg = values.length ? values.reduce((a, b) => a + b, 0) / values.length : 0;
+                return { subject, average: Number(avg.toFixed(1)), count: values.length };
+            }).filter(x => x.count > 0).sort((a, b) => a.average - b.average);
+
+            return {
+                tahun: selectedYear,
+                assessment: selectedAssessment,
+                jumlahMurid: students.length,
+                jumlahDataMarkah: withMarks.length,
+                purataSekolah: Number(schoolAverage.toFixed(1)),
+                risikoTinggi: highRisk,
+                risikoSederhana: mediumRisk,
+                risikoRendah: lowRisk,
+                subjectStats,
+                murid: rows
+            };
+        }
+
+        function renderSismarAIPage() {
+            const snapshot = getSismarAISnapshot();
+            const weakest = snapshot.subjectStats[0];
+            const best = snapshot.subjectStats[snapshot.subjectStats.length - 1];
+            const topRiskRows = [...snapshot.risikoTinggi, ...snapshot.risikoSederhana].slice(0, 8);
+
+            return `
+                <div class="space-y-6">
+                    <div class="bg-gradient-to-r from-indigo-600 via-blue-600 to-cyan-600 text-white p-6 md:p-8 rounded-3xl shadow-sm relative overflow-hidden">
+                        <div class="relative z-10 space-y-2">
+                            <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/15 border border-white/20 text-[10px] font-black uppercase tracking-wider">
+                                <i data-lucide="sparkles" class="w-3.5 h-3.5"></i> SISMAR AI Engine
+                            </div>
+                            <h3 class="text-2xl md:text-3xl font-black tracking-tight">AI Decision Support System</h3>
+                            <p class="text-sm text-blue-50 font-medium max-w-3xl">Analisis automatik prestasi murid, risiko akademik, cadangan intervensi, laporan ibu bapa dan ringkasan pentadbir berdasarkan data markah dan PBD sedia ada.</p>
+                        </div>
+                        <i data-lucide="brain-circuit" class="absolute right-6 bottom-4 w-32 h-32 opacity-10"></i>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-4 gap-4">
+                        <div class="bg-white p-5 rounded-2xl border border-blue-100 shadow-sm">
+                            <p class="text-[10px] font-black text-slate-400 uppercase">Purata Sekolah</p>
+                            <h4 class="text-2xl font-black text-slate-800">${snapshot.purataSekolah}%</h4>
+                        </div>
+                        <div class="bg-white p-5 rounded-2xl border border-rose-100 shadow-sm">
+                            <p class="text-[10px] font-black text-rose-400 uppercase">Risiko Tinggi</p>
+                            <h4 class="text-2xl font-black text-rose-700">${snapshot.risikoTinggi.length}</h4>
+                        </div>
+                        <div class="bg-white p-5 rounded-2xl border border-amber-100 shadow-sm">
+                            <p class="text-[10px] font-black text-amber-400 uppercase">Risiko Sederhana</p>
+                            <h4 class="text-2xl font-black text-amber-700">${snapshot.risikoSederhana.length}</h4>
+                        </div>
+                        <div class="bg-white p-5 rounded-2xl border border-emerald-100 shadow-sm">
+                            <p class="text-[10px] font-black text-emerald-400 uppercase">Risiko Rendah</p>
+                            <h4 class="text-2xl font-black text-emerald-700">${snapshot.risikoRendah.length}</h4>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        <div class="lg:col-span-2 bg-white rounded-3xl border border-blue-100 shadow-sm overflow-hidden">
+                            <div class="p-5 border-b border-slate-100 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                                <div>
+                                    <h3 class="font-black text-slate-800 flex items-center gap-2"><i data-lucide="bot" class="w-5 h-5 text-blue-600"></i> Jana Analisis AI</h3>
+                                    <p class="text-xs text-slate-500 font-medium">Pilih jenis laporan. Gemini akan digunakan melalui Supabase Edge Function jika tersedia.</p>
+                                </div>
+                                <button onclick="runSismarAI()" id="sismar-ai-run-btn" class="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-black flex items-center justify-center gap-2 shadow-sm">
+                                    <i data-lucide="sparkles" class="w-4 h-4"></i> JANA AI
+                                </button>
+                            </div>
+                            <div class="p-5 space-y-4">
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                    <select id="sismar-ai-mode" onchange="sismarAISelectedMode=this.value" class="p-3 border border-slate-200 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-blue-500">
+                                        <option value="sekolah" ${sismarAISelectedMode==='sekolah'?'selected':''}>AI Ringkasan Guru Besar</option>
+                                        <option value="kelas" ${sismarAISelectedMode==='kelas'?'selected':''}>AI Analisis Kelas</option>
+                                        <option value="subjek" ${sismarAISelectedMode==='subjek'?'selected':''}>AI Analisis Subjek</option>
+                                        <option value="intervensi" ${sismarAISelectedMode==='intervensi'?'selected':''}>AI Pelan Intervensi</option>
+                                        <option value="ibu_bapa" ${sismarAISelectedMode==='ibu_bapa'?'selected':''}>AI Laporan Ibu Bapa</option>
+                                        <option value="chat" ${sismarAISelectedMode==='chat'?'selected':''}>AI Chat Assistant</option>
+                                    </select>
+                                    <input id="sismar-ai-question" class="p-3 border border-slate-200 rounded-xl text-xs font-semibold outline-none focus:ring-2 focus:ring-blue-500" placeholder="Contoh: Murid mana perlu intervensi segera?">
+                                </div>
+                                <div id="sismar-ai-output" class="min-h-[260px] bg-slate-50 border border-slate-100 rounded-2xl p-5 text-sm text-slate-700 leading-relaxed whitespace-pre-wrap font-medium">${sismarAIResult || 'Klik JANA AI untuk menghasilkan analisis. Sistem masih boleh menjana analisis asas walaupun Gemini belum disambungkan.'}</div>
+                                <div class="flex flex-wrap gap-2">
+                                    <button onclick="copySismarAIResult()" class="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-xs font-black flex items-center gap-2"><i data-lucide="copy" class="w-4 h-4"></i> SALIN</button>
+                                    <button onclick="printReport()" class="px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-black flex items-center gap-2"><i data-lucide="printer" class="w-4 h-4"></i> CETAK</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="space-y-4">
+                            <div class="bg-white p-5 rounded-3xl border border-blue-100 shadow-sm space-y-2">
+                                <h3 class="font-black text-slate-800 text-sm">Insight Pantas</h3>
+                                <p class="text-xs text-slate-500 font-semibold">Subjek terbaik: <b>${best ? best.subject + ' (' + best.average + '%)' : '-'}</b></p>
+                                <p class="text-xs text-slate-500 font-semibold">Subjek lemah: <b>${weakest ? weakest.subject + ' (' + weakest.average + '%)' : '-'}</b></p>
+                                <p class="text-xs text-slate-500 font-semibold">Data markah dianalisis: <b>${snapshot.jumlahDataMarkah}</b> murid</p>
+                            </div>
+                            <div class="bg-white rounded-3xl border border-blue-100 shadow-sm overflow-hidden">
+                                <div class="p-4 border-b border-slate-100">
+                                    <h3 class="font-black text-slate-800 text-sm">Senarai Risiko</h3>
+                                </div>
+                                <div class="max-h-[360px] overflow-auto divide-y divide-slate-50">
+                                    ${topRiskRows.length === 0 ? `<div class="p-5 text-xs text-slate-400 font-bold">Tiada murid berisiko berdasarkan data semasa.</div>` : topRiskRows.map(r => {
+                                        const risk = getStudentRiskAI(r);
+                                        return `<div class="p-4 space-y-1">
+                                            <div class="flex items-start justify-between gap-2">
+                                                <p class="text-xs font-black text-slate-800 leading-snug">${r.nama}</p>
+                                                <span class="shrink-0 px-2 py-1 rounded-full border text-[9px] font-black ${risk.badge}">${r.risiko}</span>
+                                            </div>
+                                            <p class="text-[10px] text-slate-400 font-bold">${r.kelas} • Purata ${r.purata}%</p>
+                                        </div>`;
+                                    }).join('')}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function buildLocalSismarAIResponse(mode, question, snapshot) {
+            const weakest = snapshot.subjectStats[0];
+            const best = snapshot.subjectStats[snapshot.subjectStats.length - 1];
+            const riskList = [...snapshot.risikoTinggi, ...snapshot.risikoSederhana].slice(0, 10);
+            const riskText = riskList.length ? riskList.map((m, i) => `${i + 1}. ${m.nama} (${m.kelas}) - ${m.risiko}, purata ${m.purata}%. ${m.cadangan}`).join('\n') : 'Tiada murid berisiko berdasarkan data semasa.';
+
+            if (mode === 'intervensi') {
+                return `PELAN INTERVENSI AI\n\nFokus utama: ${weakest ? weakest.subject : 'Belum cukup data'}\nMurid sasaran:\n${riskText}\n\nCadangan tindakan:\n1. Jalankan diagnostik topik bagi subjek lemah.\n2. Bentuk kumpulan kecil mengikut tahap risiko.\n3. Beri latihan berfokus selama dua minggu.\n4. Semak semula markah dan TP selepas intervensi.\n5. Maklumkan perkembangan kepada guru kelas dan ibu bapa.`;
+            }
+
+            if (mode === 'ibu_bapa') {
+                const first = riskList[0];
+                if (!first) return 'Laporan ibu bapa belum dapat dijana kerana tiada murid berisiko berdasarkan data semasa.';
+                return `LAPORAN RINGKAS IBU BAPA\n\nPrestasi ${first.nama} berada pada tahap ${first.risiko}. Purata semasa ialah ${first.purata}%.\n\n${first.sebab}\n\nCadangan kepada ibu bapa:\n1. Bantu anak membuat ulang kaji sekurang-kurangnya 20 minit sehari.\n2. Pantau latihan yang diberikan oleh guru.\n3. Beri galakan positif dan hadirkan anak ke sesi intervensi.\n\nTerima kasih atas kerjasama tuan/puan.`;
+            }
+
+            if (mode === 'subjek') {
+                return `ANALISIS SUBJEK AI\n\nSubjek terbaik: ${best ? best.subject + ' dengan purata ' + best.average + '%' : '-'}\nSubjek memerlukan perhatian: ${weakest ? weakest.subject + ' dengan purata ' + weakest.average + '%' : '-'}\n\nCadangan:\n1. Kenal pasti topik yang paling banyak menyebabkan markah rendah.\n2. Laksanakan latihan pengukuhan untuk murid bawah 60%.\n3. Gunakan aktiviti pemulihan untuk murid TP1 dan TP2.\n4. Sediakan soalan pengayaan untuk murid cemerlang.`;
+            }
+
+            if (mode === 'kelas') {
+                return `ANALISIS KELAS AI\n\nTahun pentaksiran: ${snapshot.tahun}\nPentaksiran: ${snapshot.assessment}\nPurata keseluruhan: ${snapshot.purataSekolah}%\n\nRisiko tinggi: ${snapshot.risikoTinggi.length} murid\nRisiko sederhana: ${snapshot.risikoSederhana.length} murid\nRisiko rendah: ${snapshot.risikoRendah.length} murid\n\nSenarai tumpuan:\n${riskText}`;
+            }
+
+            if (mode === 'chat') {
+                return `JAWAPAN AI\n\nSoalan: ${question || 'Murid mana perlu intervensi segera?'}\n\n${riskText}\n\nCadangan utama: fokus kepada murid risiko tinggi dahulu, kemudian jalankan pemulihan berfokus untuk subjek paling lemah iaitu ${weakest ? weakest.subject : 'belum dikenal pasti'}.`;
+            }
+
+            return `RINGKASAN AI GURU BESAR\n\nJumlah murid: ${snapshot.jumlahMurid}\nMurid dengan data markah: ${snapshot.jumlahDataMarkah}\nPurata keseluruhan: ${snapshot.purataSekolah}%\n\nRisiko tinggi: ${snapshot.risikoTinggi.length} murid\nRisiko sederhana: ${snapshot.risikoSederhana.length} murid\nRisiko rendah: ${snapshot.risikoRendah.length} murid\n\nSubjek terbaik: ${best ? best.subject + ' (' + best.average + '%)' : '-'}\nSubjek lemah: ${weakest ? weakest.subject + ' (' + weakest.average + '%)' : '-'}\n\nCadangan pentadbiran:\n1. Pantau murid risiko tinggi secara mingguan.\n2. Minta guru subjek menyediakan intervensi berfokus.\n3. Semak perkembangan selepas dua minggu.\n4. Gunakan laporan ini untuk mesyuarat kurikulum dan perbincangan bersama guru kelas.`;
+        }
+
+        async function runSismarAI() {
+            const output = document.getElementById('sismar-ai-output');
+            const btn = document.getElementById('sismar-ai-run-btn');
+            const modeEl = document.getElementById('sismar-ai-mode');
+            const questionEl = document.getElementById('sismar-ai-question');
+            const mode = modeEl ? modeEl.value : sismarAISelectedMode;
+            const question = questionEl ? questionEl.value.trim() : '';
+            const snapshot = getSismarAISnapshot();
+
+            if (output) output.innerText = 'SISMAR AI sedang menjana analisis...';
+            if (btn) btn.disabled = true;
+
+            try {
+                if (supabaseEnabled && supabaseClient) {
+                    const { data, error } = await supabaseClient.functions.invoke('sismar-ai', {
+                        body: {
+                            jenis: mode,
+                            soalan: question,
+                            data: snapshot
+                        }
+                    });
+
+                    if (!error && data && (data.result || data.text || data.output)) {
+                        sismarAIResult = data.result || data.text || data.output;
+                    } else {
+                        sismarAIResult = buildLocalSismarAIResponse(mode, question, snapshot);
+                    }
+                } else {
+                    sismarAIResult = buildLocalSismarAIResponse(mode, question, snapshot);
+                }
+            } catch (err) {
+                console.warn('Gemini/Supabase Edge Function belum tersedia. Guna analisis tempatan.', err);
+                sismarAIResult = buildLocalSismarAIResponse(mode, question, snapshot);
+            }
+
+            if (output) output.innerText = sismarAIResult;
+            if (btn) btn.disabled = false;
+            showToast('Analisis SISMAR AI berjaya dijana.', 'success');
+        }
+
+        function copySismarAIResult() {
+            const text = sismarAIResult || document.getElementById('sismar-ai-output')?.innerText || '';
+            if (!text) return;
+            navigator.clipboard.writeText(text).then(() => showToast('Analisis AI telah disalin.', 'success'));
+        }
+
         // --- RENDER DYNAMIC PAGES ---
         function renderPage() {
             const content = document.getElementById('page-content');
@@ -3156,6 +3441,13 @@ if (type === 'guru_kelas') {
                                         <p class="text-xs font-bold text-gray-800">Analisis Prestasi</p>
                                         <p class="text-[10px] text-gray-400 font-medium">Statistik UASA & PBD</p>
                                     </button>
+                                    ${(!isAdmin && currentUser?.role === 'Guru') ? `
+                                    <button onclick="exportTeacherStatusCSV()" class="p-4 border border-cyan-50/60 rounded-xl bg-cyan-50/20 hover:bg-cyan-50 hover:border-cyan-200 text-left transition-all group">
+                                        <i data-lucide="file-text" class="w-5 h-5 text-cyan-600 mb-2"></i>
+                                        <p class="text-xs font-bold text-gray-800">Export CSV</p>
+                                        <p class="text-[10px] text-gray-400 font-medium">Status pengisian saya</p>
+                                    </button>
+                                    ` : ''}
                                 </div>
                             </div>
                             <div class="bg-white p-6 rounded-2xl border border-blue-100 shadow-sm flex flex-col justify-between">
@@ -3168,7 +3460,7 @@ if (type === 'guru_kelas') {
                                         <span class="w-2.5 h-2.5 rounded-full bg-blue-500 animate-ping"></span>
                                         ${supabaseEnabled ? 'Supabase Berhubung' : 'Mod Simpanan Tempatan'}
                                     </span>
-                                    <span class="text-[10px] text-gray-400 font-bold uppercase">Versi 1.6.0</span>
+                                    <span class="text-[10px] text-gray-400 font-bold uppercase">Versi SISMAR AI 5.0</span>
                                 </div>
                             </div>
                         </div>
@@ -3184,6 +3476,10 @@ if (type === 'guru_kelas') {
 
             else if (currentPage === 'slip_pentaksiran' && (isAdmin || currentUser?.role === 'Guru Kelas')) {
                 content.innerHTML = renderSlipPentaksiranPage();
+            }
+
+            else if (currentPage === 'sismar_ai') {
+                content.innerHTML = renderSismarAIPage();
             }
 
             else if (currentPage === 'data_murid' && isAdmin) {
