@@ -665,6 +665,41 @@
         let classTeacherRows = [];
         let teacherDirectoryRows = [];
         let guruKelasSelectedClass = '';
+
+        // Cache keselamatan markah/PBD yang baru diisi.
+        // Tujuan: data pada skrin tidak hilang jika Supabase lambat, gagal separa, atau refresh berlaku selepas klik Simpan/Hantar.
+        const SISMAR_MARK_DRAFT_CACHE_KEY = 'sismar_markah_draft_cache_v2';
+        const SISMAR_PBD_DRAFT_CACHE_KEY = 'sismar_pbd_draft_cache_v2';
+
+        function getAssessmentCache(cacheKey) {
+            try {
+                return JSON.parse(localStorage.getItem(cacheKey) || '{}') || {};
+            } catch (e) {
+                console.warn('Cache markah tidak dapat dibaca:', e);
+                return {};
+            }
+        }
+
+        function cacheAssessmentRows(cacheKey, rows) {
+            if (!rows || rows.length === 0) return;
+            const cache = getAssessmentCache(cacheKey);
+            rows.forEach(row => {
+                if (row && row.key) cache[row.key] = row;
+            });
+            localStorage.setItem(cacheKey, JSON.stringify(cache));
+        }
+
+        function mergeAssessmentCacheToMemory(cacheKey, memoryObject, statusArray) {
+            const cache = getAssessmentCache(cacheKey);
+            Object.values(cache).forEach(row => {
+                if (!row || !row.key) return;
+                memoryObject[row.key] = row.value;
+                const idx = statusArray.findIndex(item => item && item.key === row.key);
+                if (idx >= 0) statusArray[idx] = { ...statusArray[idx], ...row };
+                else statusArray.push(row);
+            });
+        }
+
         // --- SUPABASE DATABASE SETUP ---
         function parseKey(key) {
             const parts = String(key).split('_');
@@ -756,6 +791,11 @@
                         if (row.key) studentPBD[row.key] = row.value;
                     });
                 }
+
+                // Gabungkan cache tempatan selepas data Supabase dibaca.
+                // Ini memastikan markah/PBD yang baru diisi tidak hilang pada paparan dashboard.
+                mergeAssessmentCacheToMemory(SISMAR_MARK_DRAFT_CACHE_KEY, studentMarks, markStatusRows);
+                mergeAssessmentCacheToMemory(SISMAR_PBD_DRAFT_CACHE_KEY, studentPBD, pbdStatusRows);
 
                 // Direktori guru untuk pembetulan Admin. Emel digunakan secara dalaman sahaja dan tidak dipaparkan.
                 try {
@@ -863,19 +903,22 @@
         }
 
         async function persistMarksBulkToSupabase(markRows, pbdRows) {
-            // Stabil: simpan satu persatu berdasarkan PRIMARY KEY "key".
-            // Tujuan: jika satu rekod gagal, rekod lain masih disimpan dan ralat sebenar dipaparkan di Console.
             if (!supabaseEnabled || !supabaseClient) {
-                showToast('Supabase belum aktif. Data pada skrin tidak dipadam.', 'warning');
-                return { ok: false, marksSaved: 0, pbdSaved: 0, failed: 0 };
+                showToast('Supabase belum aktif. Data pada skrin dikekalkan.', 'warning');
+                return { ok: false, marksSaved: 0, pbdSaved: 0, failed: (markRows.length + pbdRows.length) };
             }
+
+            // Simpan dahulu dalam cache tempatan supaya tidak hilang jika refresh berlaku.
+            cacheAssessmentRows(SISMAR_MARK_DRAFT_CACHE_KEY, markRows || []);
+            cacheAssessmentRows(SISMAR_PBD_DRAFT_CACHE_KEY, pbdRows || []);
 
             const saveRowsOneByOne = async (tableName, rows) => {
                 let saved = 0;
                 let failed = 0;
 
-                for (const row of rows) {
+                for (const row of rows || []) {
                     try {
+                        // Guna PRIMARY KEY "key" supaya klik Simpan banyak kali akan UPDATE rekod yang sama, bukan bertindan.
                         const { error } = await supabaseClient
                             .from(tableName)
                             .upsert(row, { onConflict: 'key' });
@@ -895,32 +938,16 @@
                 return { saved, failed };
             };
 
-            try {
-                const markResult = await saveRowsOneByOne('marks', markRows || []);
-                const pbdResult = await saveRowsOneByOne('pbd', pbdRows || []);
-                const totalFailed = markResult.failed + pbdResult.failed;
+            const markResult = await saveRowsOneByOne('marks', markRows || []);
+            const pbdResult = await saveRowsOneByOne('pbd', pbdRows || []);
+            const totalFailed = markResult.failed + pbdResult.failed;
 
-                if (totalFailed > 0) {
-                    showToast(`Sebahagian data gagal disimpan. Markah berjaya: ${markResult.saved}/${markRows.length}, PBD berjaya: ${pbdResult.saved}/${pbdRows.length}. Sila buka Console untuk lihat rekod gagal.`, 'warning');
-                    return {
-                        ok: false,
-                        marksSaved: markResult.saved,
-                        pbdSaved: pbdResult.saved,
-                        failed: totalFailed
-                    };
-                }
-
-                return {
-                    ok: true,
-                    marksSaved: markResult.saved,
-                    pbdSaved: pbdResult.saved,
-                    failed: 0
-                };
-            } catch (e) {
-                console.error('Failed to save marks / pbd:', e);
-                showToast('Gagal simpan markah ke Supabase. Data pada skrin dikekalkan.', 'danger');
-                return { ok: false, marksSaved: 0, pbdSaved: 0, failed: (markRows.length + pbdRows.length) };
+            if (totalFailed > 0) {
+                showToast(`Sebahagian data gagal disimpan. Markah berjaya: ${markResult.saved}/${(markRows || []).length}, PBD berjaya: ${pbdResult.saved}/${(pbdRows || []).length}. Data pada skrin dikekalkan.`, 'warning');
+                return { ok: false, marksSaved: markResult.saved, pbdSaved: pbdResult.saved, failed: totalFailed };
             }
+
+            return { ok: true, marksSaved: markResult.saved, pbdSaved: pbdResult.saved, failed: 0 };
         }
 
         // --- PENGIRAAN STATISTIK PBD AUTOMATIK ---
@@ -1473,12 +1500,10 @@ if (type === 'guru_kelas') {
                     const markVal = markInput.value.trim();
 
                     // Jangan padam markah lama jika ruang kosong.
-                    // Hanya nilai yang diisi akan dihantar ke Supabase.
                     if (markVal !== '') {
                         const num = parseFloat(markVal);
                         if (!isNaN(num) && num >= 0 && num <= 100) {
-                            studentMarks[key] = num;
-                            markRows.push({
+                            const markRow = {
                                 key,
                                 student_id: String(keyInfo.student_id),
                                 tahun: keyInfo.tahun,
@@ -1489,7 +1514,9 @@ if (type === 'guru_kelas') {
                                 teacher_name: selectedTeacher,
                                 kelas: canonicalClassName(selectedClass),
                                 updated_at: new Date().toISOString()
-                            });
+                            };
+                            studentMarks[key] = num;
+                            markRows.push(markRow);
                             successCount++;
                         }
                     }
@@ -1499,10 +1526,8 @@ if (type === 'guru_kelas') {
                     const pbdVal = pbdSelect.value;
 
                     // Jangan padam PBD lama jika pilihan kosong.
-                    // Hanya TP yang dipilih akan dihantar ke Supabase.
                     if (pbdVal) {
-                        studentPBD[key] = pbdVal;
-                        pbdRows.push({
+                        const pbdRow = {
                             key,
                             student_id: String(keyInfo.student_id),
                             tahun: keyInfo.tahun,
@@ -1513,7 +1538,9 @@ if (type === 'guru_kelas') {
                             teacher_name: selectedTeacher,
                             kelas: canonicalClassName(selectedClass),
                             updated_at: new Date().toISOString()
-                        });
+                        };
+                        studentPBD[key] = pbdVal;
+                        pbdRows.push(pbdRow);
                     }
                 }
             }
@@ -1524,21 +1551,27 @@ if (type === 'guru_kelas') {
                 return false;
             }
 
+            // Cache dahulu sebelum panggilan Supabase. Ini elak data hilang selepas render/refresh.
+            cacheAssessmentRows(SISMAR_MARK_DRAFT_CACHE_KEY, markRows);
+            cacheAssessmentRows(SISMAR_PBD_DRAFT_CACHE_KEY, pbdRows);
+
             const result = await persistMarksBulkToSupabase(markRows, pbdRows);
 
-            // Refresh hanya dibuat jika semua rekod berjaya disimpan.
-            // Ini mengelakkan data pada skrin hilang apabila Supabase gagal menyimpan sebahagian rekod.
             if (result && result.ok) {
                 await fetchAllDataFromSupabase();
+                mergeAssessmentCacheToMemory(SISMAR_MARK_DRAFT_CACHE_KEY, studentMarks, markStatusRows);
+                mergeAssessmentCacheToMemory(SISMAR_PBD_DRAFT_CACHE_KEY, studentPBD, pbdStatusRows);
                 if (!silent) {
                     showToast(`Selesai menyimpan ${result.marksSaved} rekod markah dan ${result.pbdSaved} rekod PBD ke Supabase.`, 'success');
                 }
-                renderPage();
-                return true;
+            } else {
+                // Jangan ambil data kosong dari Supabase. Kekalkan data yang guru baru isi.
+                mergeAssessmentCacheToMemory(SISMAR_MARK_DRAFT_CACHE_KEY, studentMarks, markStatusRows);
+                mergeAssessmentCacheToMemory(SISMAR_PBD_DRAFT_CACHE_KEY, studentPBD, pbdStatusRows);
             }
 
             renderPage();
-            return false;
+            return !!(result && result.ok);
         }
 
         function toggleEditMode() {
@@ -1552,11 +1585,13 @@ if (type === 'guru_kelas') {
             const saved = await saveMarks(true);
 
             if (!saved) {
-                showToast('Data belum dihantar kerana simpan ke Supabase tidak lengkap. Markah pada skrin dikekalkan.', 'danger');
+                showToast('Data belum dihantar kerana simpan ke Supabase tidak lengkap. Markah pada skrin dikekalkan.', 'warning');
                 return;
             }
 
             await fetchAllDataFromSupabase();
+            mergeAssessmentCacheToMemory(SISMAR_MARK_DRAFT_CACHE_KEY, studentMarks, markStatusRows);
+            mergeAssessmentCacheToMemory(SISMAR_PBD_DRAFT_CACHE_KEY, studentPBD, pbdStatusRows);
             showToast(`Data ${selectedSubject} kelas ${selectedClass} telah dihantar. Rekod akan muncul di Dashboard Guru Kelas dan Dashboard Admin mengikut kelas, guru, subjek dan pentaksiran.`, 'success');
             renderPage();
         }
