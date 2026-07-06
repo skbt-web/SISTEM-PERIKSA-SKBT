@@ -738,6 +738,60 @@
         }
 
 
+
+        function getSavedTeacherInfoForAssessment(statusRows, key) {
+            const className = canonicalClassName(selectedClass);
+            const saved = (statusRows || []).find(row => {
+                if (!row || row.key !== key) return false;
+                if (row.kelas && canonicalClassName(row.kelas) !== className) return false;
+                return !!(row.teacher_name || row.teacher_email);
+            });
+
+            if (!saved) return null;
+            return {
+                teacher_name: saved.teacher_name || selectedTeacher || (currentUser && currentUser.name) || null,
+                teacher_email: saved.teacher_email || null
+            };
+        }
+
+        function isTeacherInfoSameAsCurrent(teacherInfo) {
+            if (!teacherInfo) return true;
+            if (isAdmin) return true;
+            const currentEmail = cleanEmail(currentUser && currentUser.email ? currentUser.email : '');
+            const teacherEmail = cleanEmail(teacherInfo.teacher_email || '');
+            const currentName = normalizeTeacherName((currentUser && currentUser.name) || selectedTeacher || '');
+            const teacherName = normalizeTeacherName(teacherInfo.teacher_name || '');
+
+            if (teacherEmail && currentEmail) return teacherEmail === currentEmail;
+            if (teacherName && currentName) return teacherName === currentName;
+            return true;
+        }
+
+        function canCurrentUserSaveAssessment(statusRows, key) {
+            const savedTeacher = getSavedTeacherInfoForAssessment(statusRows, key);
+            return isTeacherInfoSameAsCurrent(savedTeacher);
+        }
+
+        function getTeacherInfoForNewAssessment(statusRows, key) {
+            // Jika rekod sedia ada telah disimpan oleh guru tertentu, kekalkan nama guru itu.
+            // Ini menghalang Dashboard Admin menukar nama guru secara automatik apabila guru/admin lain membuka atau refresh paparan.
+            const savedTeacher = getSavedTeacherInfoForAssessment(statusRows, key);
+            if (savedTeacher) return savedTeacher;
+
+            if (!isAdmin && currentUser) {
+                return {
+                    teacher_name: currentUser.name || selectedTeacher || null,
+                    teacher_email: currentUser.email || null
+                };
+            }
+
+            const adminSelectedName = selectedTeacher || (currentUser && currentUser.name) || null;
+            return {
+                teacher_name: adminSelectedName,
+                teacher_email: getTeacherEmailByName(adminSelectedName) || (currentUser && currentUser.email) || null
+            };
+        }
+
         function preserveCurrentAssessmentInputsToMemory() {
             // Simpan nilai yang sedang ditaip/dipilih dalam memori sebelum render semula.
             // Ini penting apabila guru klik Mod Kunci/Buka, tukar paparan, atau renderPage() berlaku.
@@ -762,6 +816,7 @@
                     if (markVal !== '') {
                         const num = parseFloat(markVal);
                         if (!isNaN(num) && num >= 0 && num <= 100) {
+                            const teacherInfo = getTeacherInfoForNewAssessment(markStatusRows, key);
                             const markRow = {
                                 key,
                                 student_id: String(keyInfo.student_id),
@@ -769,8 +824,8 @@
                                 assessment: keyInfo.assessment,
                                 subject: keyInfo.subject,
                                 value: num,
-                                teacher_email: currentUser ? currentUser.email : null,
-                                teacher_name: selectedTeacher,
+                                teacher_email: teacherInfo.teacher_email,
+                                teacher_name: teacherInfo.teacher_name,
                                 kelas: canonicalClassName(selectedClass),
                                 updated_at: now
                             };
@@ -783,6 +838,7 @@
                 if (pbdSelect) {
                     const pbdVal = String(pbdSelect.value || '').trim();
                     if (pbdVal) {
+                        const teacherInfo = getTeacherInfoForNewAssessment(pbdStatusRows, key);
                         const pbdRow = {
                             key,
                             student_id: String(keyInfo.student_id),
@@ -790,8 +846,8 @@
                             assessment: keyInfo.assessment,
                             subject: keyInfo.subject,
                             value: pbdVal,
-                            teacher_email: currentUser ? currentUser.email : null,
-                            teacher_name: selectedTeacher,
+                            teacher_email: teacherInfo.teacher_email,
+                            teacher_name: teacherInfo.teacher_name,
                             kelas: canonicalClassName(selectedClass),
                             updated_at: now
                         };
@@ -1622,6 +1678,7 @@ if (type === 'guru_kelas') {
             let successCount = 0;
             const markRows = [];
             const pbdRows = [];
+            let blockedCount = 0;
 
             for (const row of rows) {
                 const sId = row.getAttribute('data-id');
@@ -1637,6 +1694,11 @@ if (type === 'guru_kelas') {
                     if (markVal !== '') {
                         const num = parseFloat(markVal);
                         if (!isNaN(num) && num >= 0 && num <= 100) {
+                            if (!canCurrentUserSaveAssessment(markStatusRows, key)) {
+                                blockedCount++;
+                                continue;
+                            }
+                            const teacherInfo = getTeacherInfoForNewAssessment(markStatusRows, key);
                             const markRow = {
                                 key,
                                 student_id: String(keyInfo.student_id),
@@ -1644,8 +1706,8 @@ if (type === 'guru_kelas') {
                                 assessment: keyInfo.assessment,
                                 subject: keyInfo.subject,
                                 value: num,
-                                teacher_email: currentUser ? currentUser.email : null,
-                                teacher_name: selectedTeacher,
+                                teacher_email: teacherInfo.teacher_email,
+                                teacher_name: teacherInfo.teacher_name,
                                 kelas: canonicalClassName(selectedClass),
                                 updated_at: new Date().toISOString()
                             };
@@ -1661,6 +1723,11 @@ if (type === 'guru_kelas') {
 
                     // Jangan padam PBD lama jika pilihan kosong.
                     if (pbdVal) {
+                        if (!canCurrentUserSaveAssessment(pbdStatusRows, key)) {
+                            blockedCount++;
+                            continue;
+                        }
+                        const teacherInfo = getTeacherInfoForNewAssessment(pbdStatusRows, key);
                         const pbdRow = {
                             key,
                             student_id: String(keyInfo.student_id),
@@ -1668,8 +1735,8 @@ if (type === 'guru_kelas') {
                             assessment: keyInfo.assessment,
                             subject: keyInfo.subject,
                             value: pbdVal,
-                            teacher_email: currentUser ? currentUser.email : null,
-                            teacher_name: selectedTeacher,
+                            teacher_email: teacherInfo.teacher_email,
+                            teacher_name: teacherInfo.teacher_name,
                             kelas: canonicalClassName(selectedClass),
                             updated_at: new Date().toISOString()
                         };
@@ -1679,8 +1746,12 @@ if (type === 'guru_kelas') {
                 }
             }
 
+            if (blockedCount > 0 && !silent) {
+                showToast(`${blockedCount} input tidak disimpan kerana rekod itu masih terikat kepada guru lain. Admin perlu guna Edit/Update Guru dahulu.`, 'warning');
+            }
+
             if (markRows.length === 0 && pbdRows.length === 0) {
-                if (!silent) showToast('Tiada markah atau PBD baharu untuk disimpan.', 'info');
+                if (!silent) showToast(blockedCount > 0 ? 'Tiada rekod disimpan kerana rekod ini masih terikat kepada guru lain.' : 'Tiada markah atau PBD baharu untuk disimpan.', blockedCount > 0 ? 'warning' : 'info');
                 renderPage();
                 return false;
             }
@@ -2019,7 +2090,7 @@ if (type === 'guru_kelas') {
                                 <i data-lucide="edit-3" class="w-5 h-5 text-purple-600"></i>
                                 Edit / Update Pengisian Guru
                             </h3>
-                            <p class="text-xs text-slate-500 font-semibold mt-1">Pembetulan ini akan mengemas kini rekod marks dan pbd yang sepadan. Markah murid tidak dipadam.</p>
+                            <p class="text-xs text-slate-500 font-semibold mt-1">Pembetulan ini hanya menukar nama guru. Markah, PBD, tarikh, kelas, subjek dan pentaksiran dikekalkan.</p>
                         </div>
                         <button onclick="closeAdminEditFillingModal()" class="p-2 rounded-xl hover:bg-slate-100 text-slate-400">
                             <i data-lucide="x" class="w-5 h-5"></i>
@@ -2034,20 +2105,20 @@ if (type === 'guru_kelas') {
                             </select>
                         </div>
                         <div class="space-y-1">
-                            <label class="text-[10px] font-black text-slate-400 uppercase">Kelas Betul</label>
-                            <select id="admin-edit-class" class="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-purple-500">
+                            <label class="text-[10px] font-black text-slate-400 uppercase">Kelas Kekal</label>
+                            <select id="admin-edit-class" disabled class="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-bold outline-none bg-slate-100 text-slate-500">
                                 ${classes.map(c => `<option value="${c}" ${c === payload.kelas ? 'selected' : ''}>${c}</option>`).join('')}
                             </select>
                         </div>
                         <div class="space-y-1">
-                            <label class="text-[10px] font-black text-slate-400 uppercase">Subjek Betul</label>
-                            <select id="admin-edit-subject" class="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-purple-500">
+                            <label class="text-[10px] font-black text-slate-400 uppercase">Subjek Kekal</label>
+                            <select id="admin-edit-subject" disabled class="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-bold outline-none bg-slate-100 text-slate-500">
                                 ${baseSubjects.map(s => `<option value="${s}" ${s === payload.subject ? 'selected' : ''}>${s}</option>`).join('')}
                             </select>
                         </div>
                         <div class="space-y-1">
-                            <label class="text-[10px] font-black text-slate-400 uppercase">Pentaksiran Betul</label>
-                            <select id="admin-edit-assessment" class="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-purple-500">
+                            <label class="text-[10px] font-black text-slate-400 uppercase">Pentaksiran Kekal</label>
+                            <select id="admin-edit-assessment" disabled class="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-bold outline-none bg-slate-100 text-slate-500">
                                 ${assessments.map(a => `<option value="${a}" ${a === payload.assessment ? 'selected' : ''}>${a}</option>`).join('')}
                             </select>
                         </div>
@@ -2055,13 +2126,13 @@ if (type === 'guru_kelas') {
 
                     <div class="bg-amber-50 border border-amber-100 text-amber-800 rounded-2xl p-4 text-xs font-semibold leading-relaxed">
                         Rekod asal: <b>${payload.teacher_name}</b> | <b>${payload.kelas}</b> | <b>${payload.subject}</b> | <b>${payload.assessment}</b><br>
-                        Selepas update, rekod akan keluar daripada guru/subjek yang salah dan masuk ke guru/subjek yang betul.
+                        Selepas update, hanya nama guru ditukar. Markah, PBD, tarikh, kelas, subjek dan pentaksiran tidak berubah.
                     </div>
 
                     <div class="flex justify-end gap-2 pt-2">
                         <button onclick="closeAdminEditFillingModal()" class="px-4 py-2 text-xs font-bold text-slate-500 bg-slate-100 hover:bg-slate-200 rounded-xl">Batal</button>
                         <button onclick="updateAdminFillingCorrection('${payloadEncoded}')" class="px-5 py-2 text-xs font-black text-white bg-purple-600 hover:bg-purple-700 rounded-xl shadow-md flex items-center gap-1.5">
-                            <i data-lucide="save" class="w-4 h-4"></i> Simpan Update
+                            <i data-lucide="save" class="w-4 h-4"></i> Simpan Perubahan
                         </button>
                     </div>
                 </div>
@@ -2082,7 +2153,7 @@ if (type === 'guru_kelas') {
             const oldEmail = cleanEmail(oldPayload.teacher_email);
             let query = supabaseClient
                 .from(tableName)
-                .select('key,value,student_id,tahun,assessment,subject,kelas,teacher_email,teacher_name,updated_at')
+                .select('key,student_id,tahun,assessment,subject,kelas,teacher_email,teacher_name,updated_at')
                 .eq('tahun', String(oldPayload.tahun))
                 .eq('assessment', oldPayload.assessment)
                 .eq('subject', oldPayload.subject)
@@ -2100,36 +2171,16 @@ if (type === 'guru_kelas') {
 
             let updatedCount = 0;
             for (const row of rows) {
-                const newKey = `${row.student_id}_${newPayload.tahun}_${newPayload.assessment}_${newPayload.subject}`;
-                const upsertRow = {
-                    key: newKey,
-                    student_id: String(row.student_id),
-                    tahun: String(newPayload.tahun),
-                    assessment: newPayload.assessment,
-                    subject: newPayload.subject,
-                    value: row.value,
-                    kelas: newPayload.kelas,
-                    teacher_name: newPayload.teacher_name,
-                    teacher_email: newPayload.teacher_email || oldPayload.teacher_email || row.teacher_email || null,
-                    updated_at: new Date().toISOString()
-                };
-
-                // Upsert ikut gabungan rasmi supaya tukar nama guru tidak mencipta rekod bertindan.
-                const { error: upsertError } = await supabaseClient
+                // Hanya tukar nama/emel guru. Jangan ubah markah, PBD, tarikh, kelas, subjek, pentaksiran atau key.
+                const { error: updateError } = await supabaseClient
                     .from(tableName)
-                    .upsert(upsertRow, { onConflict: 'student_id,tahun,assessment,subject' });
-                if (upsertError) throw upsertError;
+                    .update({
+                        teacher_name: newPayload.teacher_name,
+                        teacher_email: newPayload.teacher_email || row.teacher_email || null
+                    })
+                    .eq('key', row.key);
 
-                // Jika subjek/pentaksiran berubah, key lama berbeza. Padam rekod lama sahaja
-                // selepas rekod baharu berjaya disimpan. Markah murid tidak hilang.
-                if (row.key && row.key !== newKey) {
-                    const { error: deleteOldError } = await supabaseClient
-                        .from(tableName)
-                        .delete()
-                        .eq('key', row.key);
-                    if (deleteOldError) throw deleteOldError;
-                }
-
+                if (updateError) throw updateError;
                 updatedCount++;
             }
             return updatedCount;
@@ -2145,16 +2196,13 @@ if (type === 'guru_kelas') {
             if (!oldPayload) return;
 
             const newTeacherName = document.getElementById('admin-edit-teacher').value;
-            const newClass = document.getElementById('admin-edit-class').value;
-            const newSubject = document.getElementById('admin-edit-subject').value;
-            const newAssessment = document.getElementById('admin-edit-assessment').value;
             const newTeacherEmail = getTeacherEmailByName(newTeacherName) || cleanEmail(oldPayload.teacher_email);
 
             const newPayload = {
                 tahun: oldPayload.tahun,
-                assessment: newAssessment,
-                subject: newSubject,
-                kelas: newClass,
+                assessment: oldPayload.assessment,
+                subject: oldPayload.subject,
+                kelas: oldPayload.kelas,
                 teacher_name: newTeacherName,
                 teacher_email: newTeacherEmail
             };
@@ -2166,7 +2214,7 @@ if (type === 'guru_kelas') {
                 closeAdminEditFillingModal();
                 await fetchAllDataFromSupabase();
                 renderPage();
-                showToast(`Update berjaya. Marks: ${markCount} rekod, PBD: ${pbdCount} rekod.`, 'success');
+                showToast(`Nama guru berjaya dikemas kini. Marks: ${markCount} rekod, PBD: ${pbdCount} rekod. Markah, PBD dan tarikh dikekalkan.`, 'success');
             } catch (e) {
                 console.error('Gagal update pembetulan Admin:', e);
                 showToast('Gagal update rekod. Semak RLS, column key, atau struktur table marks/pbd.', 'danger');
@@ -2802,7 +2850,7 @@ if (type === 'guru_kelas') {
                                     <tr><td colspan="10" class="p-6 text-center text-slate-400 font-bold">Belum ada rekod pengisian untuk guru ini.</td></tr>
                                 ` : rows.map(r => `
                                     <tr class="hover:bg-slate-50/60">
-                                        <td class="p-4 font-bold text-slate-800">${currentUser?.name || r.teacher_name}</td>
+                                        <td class="p-4 font-bold text-slate-800">${r.teacher_name || currentUser?.name || '-'}</td>
                                         <td class="p-4"><span class="bg-indigo-50 text-indigo-700 text-[10px] px-2.5 py-1 rounded-full font-black">${r.kelas}</span></td>
                                         <td class="p-4 font-semibold text-slate-600">${r.subject}</td>
                                         <td class="p-4 text-slate-500 font-semibold">${r.assessment}</td>
