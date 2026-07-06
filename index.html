@@ -862,26 +862,58 @@
             }
         }
 
+        async function safeUpsertAssessmentRows(tableName, rows) {
+            if (!rows || rows.length === 0) return true;
+
+            // Kaedah utama: upsert berdasarkan murid, tahun, pentaksiran dan subjek.
+            // Kaedah sokongan: jika UNIQUE KEY belum lengkap, sistem akan update/insert satu persatu.
+            const { error } = await supabaseClient
+                .from(tableName)
+                .upsert(rows, { onConflict: 'student_id,tahun,assessment,subject' });
+
+            if (!error) return true;
+
+            console.warn(`Upsert ${tableName} gagal. Cuba simpan satu persatu.`, error);
+
+            for (const row of rows) {
+                const { data: existingRows, error: findError } = await supabaseClient
+                    .from(tableName)
+                    .select('id,key')
+                    .eq('student_id', row.student_id)
+                    .eq('tahun', row.tahun)
+                    .eq('assessment', row.assessment)
+                    .eq('subject', row.subject)
+                    .limit(1);
+
+                if (findError) throw findError;
+
+                if (existingRows && existingRows.length > 0 && existingRows[0].id) {
+                    const { error: updateError } = await supabaseClient
+                        .from(tableName)
+                        .update(row)
+                        .eq('id', existingRows[0].id);
+                    if (updateError) throw updateError;
+                } else {
+                    const { error: insertError } = await supabaseClient
+                        .from(tableName)
+                        .insert(row);
+                    if (insertError) throw insertError;
+                }
+            }
+
+            return true;
+        }
+
         async function persistMarksBulkToSupabase(markRows, pbdRows) {
             // Pulangkan status supaya sistem tidak refresh dan hilangkan data pada skrin jika Supabase gagal.
             if (!supabaseEnabled || !supabaseClient) return false;
             try {
-                if (markRows.length > 0) {
-                    const { error } = await supabaseClient
-                        .from('marks')
-                        .upsert(markRows, { onConflict: 'student_id,tahun,assessment,subject' });
-                    if (error) throw error;
-                }
-                if (pbdRows.length > 0) {
-                    const { error } = await supabaseClient
-                        .from('pbd')
-                        .upsert(pbdRows, { onConflict: 'student_id,tahun,assessment,subject' });
-                    if (error) throw error;
-                }
+                await safeUpsertAssessmentRows('marks', markRows);
+                await safeUpsertAssessmentRows('pbd', pbdRows);
                 return true;
             } catch (e) {
                 console.error('Failed to save marks / pbd:', e);
-                showToast('Gagal simpan markah ke Supabase. Data pada skrin dikekalkan. Semak RLS atau UNIQUE KEY.', 'danger');
+                showToast('Gagal simpan markah ke Supabase. Data pada skrin dikekalkan. Semak RLS, UPDATE/INSERT policy atau nama lajur.', 'danger');
                 return false;
             }
         }
@@ -1510,7 +1542,13 @@ if (type === 'guru_kelas') {
 
         async function hantarKeGuruKelas() {
             selectedClass = canonicalClassName(selectedClass);
-            await saveMarks(true);
+            const saved = await saveMarks(true);
+
+            if (!saved) {
+                showToast('Data belum dihantar kerana simpan ke Supabase tidak berjaya. Markah pada skrin dikekalkan.', 'danger');
+                return;
+            }
+
             await fetchAllDataFromSupabase();
             showToast(`Data ${selectedSubject} kelas ${selectedClass} telah dihantar. Rekod akan muncul di Dashboard Guru Kelas dan Dashboard Admin mengikut kelas, guru, subjek dan pentaksiran.`, 'success');
             renderPage();
