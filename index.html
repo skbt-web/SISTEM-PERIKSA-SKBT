@@ -862,59 +862,64 @@
             }
         }
 
-        async function safeUpsertAssessmentRows(tableName, rows) {
-            if (!rows || rows.length === 0) return true;
-
-            // Kaedah utama: upsert berdasarkan murid, tahun, pentaksiran dan subjek.
-            // Kaedah sokongan: jika UNIQUE KEY belum lengkap, sistem akan update/insert satu persatu.
-            const { error } = await supabaseClient
-                .from(tableName)
-                .upsert(rows, { onConflict: 'student_id,tahun,assessment,subject' });
-
-            if (!error) return true;
-
-            console.warn(`Upsert ${tableName} gagal. Cuba simpan satu persatu.`, error);
-
-            for (const row of rows) {
-                const { data: existingRows, error: findError } = await supabaseClient
-                    .from(tableName)
-                    .select('id,key')
-                    .eq('student_id', row.student_id)
-                    .eq('tahun', row.tahun)
-                    .eq('assessment', row.assessment)
-                    .eq('subject', row.subject)
-                    .limit(1);
-
-                if (findError) throw findError;
-
-                if (existingRows && existingRows.length > 0 && existingRows[0].id) {
-                    const { error: updateError } = await supabaseClient
-                        .from(tableName)
-                        .update(row)
-                        .eq('id', existingRows[0].id);
-                    if (updateError) throw updateError;
-                } else {
-                    const { error: insertError } = await supabaseClient
-                        .from(tableName)
-                        .insert(row);
-                    if (insertError) throw insertError;
-                }
+        async function persistMarksBulkToSupabase(markRows, pbdRows) {
+            // Stabil: simpan satu persatu berdasarkan PRIMARY KEY "key".
+            // Tujuan: jika satu rekod gagal, rekod lain masih disimpan dan ralat sebenar dipaparkan di Console.
+            if (!supabaseEnabled || !supabaseClient) {
+                showToast('Supabase belum aktif. Data pada skrin tidak dipadam.', 'warning');
+                return { ok: false, marksSaved: 0, pbdSaved: 0, failed: 0 };
             }
 
-            return true;
-        }
+            const saveRowsOneByOne = async (tableName, rows) => {
+                let saved = 0;
+                let failed = 0;
 
-        async function persistMarksBulkToSupabase(markRows, pbdRows) {
-            // Pulangkan status supaya sistem tidak refresh dan hilangkan data pada skrin jika Supabase gagal.
-            if (!supabaseEnabled || !supabaseClient) return false;
+                for (const row of rows) {
+                    try {
+                        const { error } = await supabaseClient
+                            .from(tableName)
+                            .upsert(row, { onConflict: 'key' });
+
+                        if (error) {
+                            failed++;
+                            console.error(`Gagal simpan ${tableName}:`, row, error);
+                        } else {
+                            saved++;
+                        }
+                    } catch (err) {
+                        failed++;
+                        console.error(`Ralat simpan ${tableName}:`, row, err);
+                    }
+                }
+
+                return { saved, failed };
+            };
+
             try {
-                await safeUpsertAssessmentRows('marks', markRows);
-                await safeUpsertAssessmentRows('pbd', pbdRows);
-                return true;
+                const markResult = await saveRowsOneByOne('marks', markRows || []);
+                const pbdResult = await saveRowsOneByOne('pbd', pbdRows || []);
+                const totalFailed = markResult.failed + pbdResult.failed;
+
+                if (totalFailed > 0) {
+                    showToast(`Sebahagian data gagal disimpan. Markah berjaya: ${markResult.saved}/${markRows.length}, PBD berjaya: ${pbdResult.saved}/${pbdRows.length}. Sila buka Console untuk lihat rekod gagal.`, 'warning');
+                    return {
+                        ok: false,
+                        marksSaved: markResult.saved,
+                        pbdSaved: pbdResult.saved,
+                        failed: totalFailed
+                    };
+                }
+
+                return {
+                    ok: true,
+                    marksSaved: markResult.saved,
+                    pbdSaved: pbdResult.saved,
+                    failed: 0
+                };
             } catch (e) {
                 console.error('Failed to save marks / pbd:', e);
-                showToast('Gagal simpan markah ke Supabase. Data pada skrin dikekalkan. Semak RLS, UPDATE/INSERT policy atau nama lajur.', 'danger');
-                return false;
+                showToast('Gagal simpan markah ke Supabase. Data pada skrin dikekalkan.', 'danger');
+                return { ok: false, marksSaved: 0, pbdSaved: 0, failed: (markRows.length + pbdRows.length) };
             }
         }
 
@@ -1467,8 +1472,8 @@ if (type === 'guru_kelas') {
                 if (markInput) {
                     const markVal = markInput.value.trim();
 
-                    // Jangan padam markah lama apabila ruang kosong.
-                    // Ini mengelakkan markah hilang selepas klik Simpan atau Hantar.
+                    // Jangan padam markah lama jika ruang kosong.
+                    // Hanya nilai yang diisi akan dihantar ke Supabase.
                     if (markVal !== '') {
                         const num = parseFloat(markVal);
                         if (!isNaN(num) && num >= 0 && num <= 100) {
@@ -1493,8 +1498,8 @@ if (type === 'guru_kelas') {
                 if (pbdSelect) {
                     const pbdVal = pbdSelect.value;
 
-                    // Jangan padam PBD lama apabila pilihan kosong.
-                    // Sistem hanya simpan PBD yang dipilih oleh guru.
+                    // Jangan padam PBD lama jika pilihan kosong.
+                    // Hanya TP yang dipilih akan dihantar ke Supabase.
                     if (pbdVal) {
                         studentPBD[key] = pbdVal;
                         pbdRows.push({
@@ -1519,19 +1524,21 @@ if (type === 'guru_kelas') {
                 return false;
             }
 
-            const saved = await persistMarksBulkToSupabase(markRows, pbdRows);
+            const result = await persistMarksBulkToSupabase(markRows, pbdRows);
 
-            // Refresh hanya dibuat selepas simpan berjaya.
-            // Jika simpan gagal, data pada skrin tidak akan dipadam oleh data kosong dari Supabase.
-            if (saved) {
+            // Refresh hanya dibuat jika semua rekod berjaya disimpan.
+            // Ini mengelakkan data pada skrin hilang apabila Supabase gagal menyimpan sebahagian rekod.
+            if (result && result.ok) {
                 await fetchAllDataFromSupabase();
                 if (!silent) {
-                    showToast(`Selesai menyimpan ${successCount} rekod markah dan ${pbdRows.length} rekod PBD ke Supabase.`, 'success');
+                    showToast(`Selesai menyimpan ${result.marksSaved} rekod markah dan ${result.pbdSaved} rekod PBD ke Supabase.`, 'success');
                 }
+                renderPage();
+                return true;
             }
 
             renderPage();
-            return saved;
+            return false;
         }
 
         function toggleEditMode() {
@@ -1545,7 +1552,7 @@ if (type === 'guru_kelas') {
             const saved = await saveMarks(true);
 
             if (!saved) {
-                showToast('Data belum dihantar kerana simpan ke Supabase tidak berjaya. Markah pada skrin dikekalkan.', 'danger');
+                showToast('Data belum dihantar kerana simpan ke Supabase tidak lengkap. Markah pada skrin dikekalkan.', 'danger');
                 return;
             }
 
@@ -2407,19 +2414,12 @@ if (type === 'guru_kelas') {
                 const total = getClassStudentCount(item.kelas);
                 const markCompleted = item.markIds.size;
                 const pbdCompleted = item.pbdIds.size;
-
-                // Status Dashboard Guru ditarik terus daripada Supabase.
-                // Jika markah ATAU PBD untuk satu subjek sudah cukup bilangan murid kelas,
-                // status dikira SIAP supaya rekod markah yang sudah ada di Supabase tidak kekal sebagai SEBAHAGIAN.
-                // Nilai lengkapBoth masih dikekalkan untuk rujukan lama tanpa mengganggu struktur asal.
                 const completeBoth = Math.min(markCompleted, pbdCompleted);
-                const completedFromSupabase = Math.max(markCompleted, pbdCompleted);
-                const percent = total > 0 ? Math.min(100, Math.round((completedFromSupabase / total) * 100)) : 0;
+                const percent = total > 0 ? Math.round((completeBoth / total) * 100) : 0;
                 let status = 'BELUM MULA';
-                if (completedFromSupabase > 0 && completedFromSupabase < total) status = 'SEBAHAGIAN';
-                if (total > 0 && completedFromSupabase >= total) status = 'SIAP';
-
-                return { ...item, total, markCompleted, pbdCompleted, completeBoth, completedFromSupabase, percent, status };
+                if (completeBoth > 0 && completeBoth < total) status = 'SEBAHAGIAN';
+                if (total > 0 && markCompleted >= total && pbdCompleted >= total) status = 'SIAP';
+                return { ...item, total, markCompleted, pbdCompleted, completeBoth, percent, status };
             }).sort((a, b) => {
                 return (a.kelas + a.subject + a.assessment).localeCompare(b.kelas + b.subject + b.assessment);
             });
@@ -2555,7 +2555,7 @@ if (type === 'guru_kelas') {
             const siap = rows.filter(r => r.status === 'SIAP').length;
             const sebahagian = rows.filter(r => r.status === 'SEBAHAGIAN').length;
             const belum = rows.filter(r => r.status === 'BELUM MULA').length;
-            const jumlahMurid = rows.reduce((sum, r) => sum + (r.completedFromSupabase || r.completeBoth || 0), 0);
+            const jumlahMurid = rows.reduce((sum, r) => sum + r.completeBoth, 0);
 
             return `
                 <div class="bg-white rounded-2xl border border-indigo-100 shadow-sm overflow-hidden">
@@ -2566,11 +2566,11 @@ if (type === 'guru_kelas') {
                                 Status Pengisian Saya
                             </h3>
                             <p class="text-[11px] text-slate-500 font-semibold mt-1">
-                                Paparan ini menarik rekod markah dan PBD terus daripada Supabase berdasarkan emel login dan nama guru.
+                                Paparan ini hanya menunjukkan rekod milik ${currentUser?.name || 'guru ini'} berdasarkan emel login dan nama guru.
                             </p>
                         </div>
                         <div class="flex flex-wrap items-center gap-2 no-print">
-                            <button onclick="fetchAllDataFromSupabase().then(()=>{showToast('Markah dan PBD telah ditarik semula dari Supabase ke Dashboard Guru.', 'success'); renderPage();})" class="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5">
+                            <button onclick="fetchAllDataFromSupabase().then(()=>{showToast('Status guru telah disegerakkan.', 'success'); renderPage();})" class="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5">
                                 <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i> Segar
                             </button>
                             <button onclick="exportTeacherStatusCSV()" class="px-3 py-2 bg-cyan-600 hover:bg-cyan-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5">
@@ -2589,7 +2589,7 @@ if (type === 'guru_kelas') {
                         <div class="bg-white p-4 rounded-2xl border border-slate-100"><p class="text-[10px] font-bold text-slate-400 uppercase">Rekod Subjek</p><h4 class="text-xl font-black text-slate-800">${rows.length}</h4></div>
                         <div class="bg-white p-4 rounded-2xl border border-slate-100"><p class="text-[10px] font-bold text-slate-400 uppercase">Siap</p><h4 class="text-xl font-black text-blue-700">${siap}</h4></div>
                         <div class="bg-white p-4 rounded-2xl border border-slate-100"><p class="text-[10px] font-bold text-slate-400 uppercase">Sebahagian</p><h4 class="text-xl font-black text-amber-700">${sebahagian}</h4></div>
-                        <div class="bg-white p-4 rounded-2xl border border-slate-100"><p class="text-[10px] font-bold text-slate-400 uppercase">Data Dari Supabase</p><h4 class="text-xl font-black text-purple-700">${jumlahMurid}</h4></div>
+                        <div class="bg-white p-4 rounded-2xl border border-slate-100"><p class="text-[10px] font-bold text-slate-400 uppercase">Murid Lengkap</p><h4 class="text-xl font-black text-purple-700">${jumlahMurid}</h4></div>
                     </div>
 
                     <div class="overflow-x-auto">
