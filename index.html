@@ -700,6 +700,43 @@
             });
         }
 
+        function isSameTeacherForFilling(row) {
+            if (!row) return false;
+            const rowEmail = cleanEmail(row.teacher_email || '');
+            const currentEmail = cleanEmail(currentUser && currentUser.email ? currentUser.email : '');
+            const selectedName = normalizeTeacherName(selectedTeacher || (currentUser && currentUser.name) || '');
+            const rowName = normalizeTeacherName(row.teacher_name || '');
+
+            // Admin boleh melihat/membetulkan rekod berdasarkan guru yang dipilih.
+            if (isAdmin) {
+                return !selectedName || rowName === selectedName;
+            }
+
+            // Guru biasa hanya melihat data sendiri. Jika rekod lama tiada emel,
+            // nama guru digunakan sebagai padanan selamat.
+            if (rowEmail && currentEmail && rowEmail === currentEmail) return true;
+            return rowName && selectedName && rowName === selectedName;
+        }
+
+        function getAssessmentValueForCurrentFilling(statusRows, cacheKey, key, fallbackObject) {
+            const cache = getAssessmentCache(cacheKey);
+            const cachedRow = cache[key];
+            if (cachedRow && isSameTeacherForFilling(cachedRow)) return cachedRow.value;
+
+            const className = canonicalClassName(selectedClass);
+            const found = (statusRows || []).find(row => {
+                if (!row || row.key !== key) return false;
+                if (row.kelas && canonicalClassName(row.kelas) !== className) return false;
+                return isSameTeacherForFilling(row);
+            });
+            if (found) return found.value;
+
+            // Admin sahaja boleh menggunakan fallback global. Guru biasa tidak akan
+            // melihat markah guru lain walaupun key murid/subjek sama.
+            if (isAdmin && fallbackObject && fallbackObject[key] !== undefined) return fallbackObject[key];
+            return '';
+        }
+
 
         function preserveCurrentAssessmentInputsToMemory() {
             // Simpan nilai yang sedang ditaip/dipilih dalam memori sebelum render semula.
@@ -1269,6 +1306,12 @@ if (!teacherError && teacher?.name) {
 currentUser.name = namaGuru;
 currentUser.fullName = namaGuru;
 
+// Guru biasa hanya mengisi markah atas nama sendiri.
+// Ini mengelakkan markah guru lain muncul dalam paparan pengisian guru.
+if (type === 'guru') {
+    selectedTeacher = namaGuru;
+}
+
 // Pastikan data Guru Kelas dimuat dahulu sebelum dashboard dipaparkan.
 // Ini mengelakkan perlu refresh atau login dua kali.
 if (type === 'guru_kelas') {
@@ -1566,7 +1609,10 @@ if (type === 'guru_kelas') {
             if (subElem) {
                 selectedSubject = subElem.value || 'BAHASA ARAB';
             }
-            selectedTeacher = document.getElementById('sel-teacher').value;
+            const teacherElem = document.getElementById('sel-teacher');
+            selectedTeacher = (!isAdmin && currentUser && currentUser.role === 'Guru')
+                ? currentUser.name
+                : (teacherElem ? teacherElem.value : selectedTeacher);
             renderPage();
         }
 
@@ -1857,18 +1903,29 @@ if (type === 'guru_kelas') {
                         teacher_email: row.teacher_email || '-',
                         markStudentIds: new Set(),
                         pbdStudentIds: new Set(),
-                        allStudentIds: new Set(),
-                        updated_at: row.updated_at || row.tarikh || null
+                        updated_at: row.updated_at || row.tarikh || null,
+                        mark_updated_at: null,
+                        pbd_updated_at: null
                     };
                 }
 
-                if (row.student_id) {
-                    grouped[key].allStudentIds.add(String(row.student_id));
-                    if (row.data_type === 'MARKAH') grouped[key].markStudentIds.add(String(row.student_id));
-                    if (row.data_type === 'PBD') grouped[key].pbdStudentIds.add(String(row.student_id));
+                const rowDate = row.updated_at || row.tarikh || null;
+
+                if (row.student_id && row.value !== null && row.value !== undefined && row.value !== '') {
+                    if (row.data_type === 'MARKAH') {
+                        grouped[key].markStudentIds.add(String(row.student_id));
+                        if (rowDate && (!grouped[key].mark_updated_at || new Date(rowDate) > new Date(grouped[key].mark_updated_at))) {
+                            grouped[key].mark_updated_at = rowDate;
+                        }
+                    }
+                    if (row.data_type === 'PBD') {
+                        grouped[key].pbdStudentIds.add(String(row.student_id));
+                        if (rowDate && (!grouped[key].pbd_updated_at || new Date(rowDate) > new Date(grouped[key].pbd_updated_at))) {
+                            grouped[key].pbd_updated_at = rowDate;
+                        }
+                    }
                 }
 
-                const rowDate = row.updated_at || row.tarikh || null;
                 if (rowDate && (!grouped[key].updated_at || new Date(rowDate) > new Date(grouped[key].updated_at))) {
                     grouped[key].updated_at = rowDate;
                 }
@@ -1878,11 +1935,13 @@ if (type === 'guru_kelas') {
                 const total = getClassStudentCount(item.kelas);
                 const markCompleted = item.markStudentIds.size;
                 const pbdCompleted = item.pbdStudentIds.size;
-                const completed = item.allStudentIds.size;
+                // Status rasmi mesti lengkap kedua-duanya: markah kelas dan PBD.
+                // Ini mengelakkan paparan 100% palsu jika hanya markah atau hanya PBD sahaja lengkap.
+                const completed = Math.min(markCompleted, pbdCompleted);
                 const percent = total > 0 ? Math.round((completed / total) * 100) : 0;
                 let status = 'BELUM MULA';
-                if (completed > 0 && completed < total) status = 'SEBAHAGIAN';
-                if (total > 0 && completed >= total) status = 'SIAP';
+                if ((markCompleted > 0 || pbdCompleted > 0) && completed < total) status = 'SEBAHAGIAN';
+                if (total > 0 && markCompleted >= total && pbdCompleted >= total) status = 'SIAP';
                 return { ...item, total, completed, markCompleted, pbdCompleted, percent, status };
             });
 
@@ -2023,7 +2082,7 @@ if (type === 'guru_kelas') {
             const oldEmail = cleanEmail(oldPayload.teacher_email);
             let query = supabaseClient
                 .from(tableName)
-                .select('student_id,tahun,assessment,subject,kelas,teacher_email,teacher_name')
+                .select('key,value,student_id,tahun,assessment,subject,kelas,teacher_email,teacher_name,updated_at')
                 .eq('tahun', String(oldPayload.tahun))
                 .eq('assessment', oldPayload.assessment)
                 .eq('subject', oldPayload.subject)
@@ -2031,7 +2090,7 @@ if (type === 'guru_kelas') {
 
             if (oldEmail && oldEmail !== '-') {
                 query = query.eq('teacher_email', oldEmail);
-            } else {
+            } else if (oldPayload.teacher_name) {
                 query = query.eq('teacher_name', oldPayload.teacher_name);
             }
 
@@ -2042,33 +2101,35 @@ if (type === 'guru_kelas') {
             let updatedCount = 0;
             for (const row of rows) {
                 const newKey = `${row.student_id}_${newPayload.tahun}_${newPayload.assessment}_${newPayload.subject}`;
-                let updateQuery = supabaseClient
-                    .from(tableName)
-                    .update({
-                        key: newKey,
-                        tahun: String(newPayload.tahun),
-                        assessment: newPayload.assessment,
-                        subject: newPayload.subject,
-                        kelas: newPayload.kelas,
-                        teacher_name: newPayload.teacher_name,
-                        teacher_email: newPayload.teacher_email || oldPayload.teacher_email || null,
-                        updated_at: new Date().toISOString()
-                    })
-                    .eq('student_id', String(row.student_id))
-                    .eq('tahun', String(oldPayload.tahun))
-                    .eq('assessment', oldPayload.assessment)
-                    .eq('subject', oldPayload.subject)
-                    .eq('kelas', oldPayload.kelas);
+                const upsertRow = {
+                    key: newKey,
+                    student_id: String(row.student_id),
+                    tahun: String(newPayload.tahun),
+                    assessment: newPayload.assessment,
+                    subject: newPayload.subject,
+                    value: row.value,
+                    kelas: newPayload.kelas,
+                    teacher_name: newPayload.teacher_name,
+                    teacher_email: newPayload.teacher_email || oldPayload.teacher_email || row.teacher_email || null,
+                    updated_at: new Date().toISOString()
+                };
 
-                const rowEmail = cleanEmail(row.teacher_email || oldPayload.teacher_email);
-                if (rowEmail && rowEmail !== '-') {
-                    updateQuery = updateQuery.eq('teacher_email', rowEmail);
-                } else {
-                    updateQuery = updateQuery.eq('teacher_name', oldPayload.teacher_name);
+                // Upsert ikut gabungan rasmi supaya tukar nama guru tidak mencipta rekod bertindan.
+                const { error: upsertError } = await supabaseClient
+                    .from(tableName)
+                    .upsert(upsertRow, { onConflict: 'student_id,tahun,assessment,subject' });
+                if (upsertError) throw upsertError;
+
+                // Jika subjek/pentaksiran berubah, key lama berbeza. Padam rekod lama sahaja
+                // selepas rekod baharu berjaya disimpan. Markah murid tidak hilang.
+                if (row.key && row.key !== newKey) {
+                    const { error: deleteOldError } = await supabaseClient
+                        .from(tableName)
+                        .delete()
+                        .eq('key', row.key);
+                    if (deleteOldError) throw deleteOldError;
                 }
 
-                const { error: updateError } = await updateQuery;
-                if (updateError) throw updateError;
                 updatedCount++;
             }
             return updatedCount;
@@ -2169,25 +2230,29 @@ if (type === 'guru_kelas') {
                                     <th class="p-4">Kelas</th>
                                     <th class="p-4">Subjek</th>
                                     <th class="p-4">Pentaksiran</th>
-                                    <th class="p-4 text-center">Diisi</th>
+                                    <th class="p-4 text-center">Markah</th>
+                                    <th class="p-4 text-center">PBD</th>
                                     <th class="p-4 text-center">%</th>
-                                    <th class="p-4">Kemaskini</th>
+                                    <th class="p-4">Tarikh Markah</th>
+                                    <th class="p-4">Tarikh PBD</th>
                                     <th class="p-4 text-center">Status</th>
                                     <th class="p-4 text-center no-print">Tindakan</th>
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-slate-50">
                                 ${rows.length === 0 ? `
-                                    <tr><td colspan="9" class="p-6 text-center text-slate-400 font-bold">Belum ada data pengisian untuk pilihan ini.</td></tr>
+                                    <tr><td colspan="11" class="p-6 text-center text-slate-400 font-bold">Belum ada data pengisian untuk pilihan ini.</td></tr>
                                 ` : rows.map(r => `
                                     <tr class="hover:bg-slate-50/60">
                                         <td class="p-4 font-bold text-slate-800">${r.teacher_name}</td>
                                         <td class="p-4"><span class="bg-blue-50 text-blue-700 text-[10px] px-2.5 py-1 rounded-full font-black">${r.kelas}</span></td>
                                         <td class="p-4 font-semibold text-slate-600">${r.subject}</td>
                                         <td class="p-4 text-slate-500 font-semibold">${r.assessment}</td>
-                                        <td class="p-4 text-center font-black text-slate-700">${r.completed}/${r.total}</td>
+                                        <td class="p-4 text-center font-black text-slate-700">${r.markCompleted}/${r.total}</td>
+                                        <td class="p-4 text-center font-black text-slate-700">${r.pbdCompleted}/${r.total}</td>
                                         <td class="p-4 text-center font-black text-slate-700">${r.percent}%</td>
-                                        <td class="p-4 text-slate-500 font-semibold">${formatDateTimeMY(r.updated_at)}</td>
+                                        <td class="p-4 text-slate-500 font-semibold">${formatDateTimeMY(r.mark_updated_at)}</td>
+                                        <td class="p-4 text-slate-500 font-semibold">${formatDateTimeMY(r.pbd_updated_at)}</td>
                                         <td class="p-4 text-center">${renderStatusBadge(r.status)}</td>
                                         <td class="p-4 text-center no-print">
                                             <button onclick="openAdminEditFilling('${encodeAdminEditPayload(r)}')" class="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-[10px] font-black inline-flex items-center gap-1">
@@ -2815,24 +2880,67 @@ if (type === 'guru_kelas') {
             let completedSubjects = 0;
             let partialSubjects = 0;
             let totalFilled = 0;
+            let latestMarkDate = null;
+            let latestPbdDate = null;
+            const subjectDetails = [];
 
             subjectList.forEach(sub => {
-                const combinedRows = [ ...(markStatusRows || []), ...(pbdStatusRows || []) ];
-                const filled = new Set(combinedRows.filter(row =>
-                    isSameClassOnly(row.kelas, kelasName) &&
-                    row.subject === sub &&
-                    row.assessment === selectedAssessment &&
-                    String(row.tahun) === String(selectedYear)
-                ).map(row => String(row.student_id))).size;
+                const markIds = new Set();
+                const pbdIds = new Set();
+                const teachers = new Set();
+                let markDate = null;
+                let pbdDate = null;
 
+                (markStatusRows || []).forEach(row => {
+                    if (!row) return;
+                    if (!isSameClassOnly(row.kelas, kelasName)) return;
+                    if (row.subject !== sub) return;
+                    if (row.assessment !== selectedAssessment) return;
+                    if (String(row.tahun) !== String(selectedYear)) return;
+                    if (row.value === null || row.value === undefined || row.value === '') return;
+                    if (row.student_id) markIds.add(String(row.student_id));
+                    if (row.teacher_name) teachers.add(row.teacher_name);
+                    const d = row.updated_at || row.tarikh || null;
+                    if (d && (!markDate || new Date(d) > new Date(markDate))) markDate = d;
+                    if (d && (!latestMarkDate || new Date(d) > new Date(latestMarkDate))) latestMarkDate = d;
+                });
+
+                (pbdStatusRows || []).forEach(row => {
+                    if (!row) return;
+                    if (!isSameClassOnly(row.kelas, kelasName)) return;
+                    if (row.subject !== sub) return;
+                    if (row.assessment !== selectedAssessment) return;
+                    if (String(row.tahun) !== String(selectedYear)) return;
+                    if (row.value === null || row.value === undefined || row.value === '') return;
+                    if (row.student_id) pbdIds.add(String(row.student_id));
+                    if (row.teacher_name) teachers.add(row.teacher_name);
+                    const d = row.updated_at || row.tarikh || null;
+                    if (d && (!pbdDate || new Date(d) > new Date(pbdDate))) pbdDate = d;
+                    if (d && (!latestPbdDate || new Date(d) > new Date(latestPbdDate))) latestPbdDate = d;
+                });
+
+                const markFilled = markIds.size;
+                const pbdFilled = pbdIds.size;
+                const filled = Math.min(markFilled, pbdFilled);
                 totalFilled += filled;
-                if (totalStudents > 0 && filled >= totalStudents) completedSubjects++;
-                else if (filled > 0) partialSubjects++;
+                if (totalStudents > 0 && markFilled >= totalStudents && pbdFilled >= totalStudents) completedSubjects++;
+                else if (markFilled > 0 || pbdFilled > 0) partialSubjects++;
+
+                subjectDetails.push({
+                    subject: sub,
+                    teacher_name: Array.from(teachers).join(', ') || '-',
+                    markFilled,
+                    pbdFilled,
+                    total: totalStudents,
+                    markDate,
+                    pbdDate,
+                    status: (totalStudents > 0 && markFilled >= totalStudents && pbdFilled >= totalStudents) ? 'SIAP' : ((markFilled > 0 || pbdFilled > 0) ? 'SEBAHAGIAN' : 'BELUM MULA')
+                });
             });
 
             const totalRequired = totalStudents * subjectList.length;
             const percent = totalRequired > 0 ? Math.round((totalFilled / totalRequired) * 100) : 0;
-            return { totalStudents, subjectCount: subjectList.length, completedSubjects, partialSubjects, totalFilled, totalRequired, percent };
+            return { totalStudents, subjectCount: subjectList.length, completedSubjects, partialSubjects, totalFilled, totalRequired, percent, latestMarkDate, latestPbdDate, subjectDetails };
         }
 
         function getSubjectsForClass(kelasName) {
@@ -2906,6 +3014,17 @@ if (type === 'guru_kelas') {
         function renderGuruKelasOfficialFlow(kelasName) {
             const assignment = getAllowedGuruKelasClasses().find(x => x.kelas === kelasName) || classTeacherAssignments.find(x => x.kelas === kelasName) || {};
             const summary = getClassCompletionSummary(kelasName);
+            const guruKelasSubjectRows = (summary.subjectDetails || []).map(item => `
+                <tr class="hover:bg-slate-50/60">
+                    <td class="p-3 font-bold text-slate-700">${item.subject}</td>
+                    <td class="p-3 text-slate-500 font-semibold">${item.teacher_name}</td>
+                    <td class="p-3 text-center font-black text-slate-700">${item.markFilled}/${item.total}</td>
+                    <td class="p-3 text-center font-black text-slate-700">${item.pbdFilled}/${item.total}</td>
+                    <td class="p-3 text-slate-500 font-semibold">${formatDateTimeMY(item.markDate)}</td>
+                    <td class="p-3 text-slate-500 font-semibold">${formatDateTimeMY(item.pbdDate)}</td>
+                    <td class="p-3 text-center">${renderStatusBadge(item.status)}</td>
+                </tr>
+            `).join('');
             const markahVerification = getVerificationForClass(kelasName, 'MARKAH');
             const pbdVerification = getVerificationForClass(kelasName, 'PBD');
 
@@ -2938,7 +3057,7 @@ if (type === 'guru_kelas') {
                         </div>
                     </div>
 
-                    <div class="p-5 grid grid-cols-1 md:grid-cols-3 gap-4 border-b border-slate-100">
+                    <div class="p-5 grid grid-cols-1 md:grid-cols-5 gap-4 border-b border-slate-100">
                         <div class="bg-slate-50 p-4 rounded-2xl border border-slate-100">
                             <p class="text-[10px] font-black text-slate-400 uppercase">Kelas</p>
                             <h4 class="text-xl font-black text-slate-800">${kelasName}</h4>
@@ -2955,6 +3074,37 @@ if (type === 'guru_kelas') {
                             <div class="mt-2 h-2 bg-white rounded-full overflow-hidden border border-purple-100">
                                 <div class="h-full bg-purple-600" style="width:${summary.percent}%"></div>
                             </div>
+                        </div>
+                        <div class="bg-emerald-50 p-4 rounded-2xl border border-emerald-100">
+                            <p class="text-[10px] font-black text-emerald-500 uppercase">Tarikh Markah</p>
+                            <h4 class="text-sm font-black text-emerald-800 leading-snug">${formatDateTimeMY(summary.latestMarkDate)}</h4>
+                            <p class="text-[11px] text-emerald-600 font-semibold mt-1">Terakhir ikut guru/subjek</p>
+                        </div>
+                        <div class="bg-amber-50 p-4 rounded-2xl border border-amber-100">
+                            <p class="text-[10px] font-black text-amber-500 uppercase">Tarikh PBD</p>
+                            <h4 class="text-sm font-black text-amber-800 leading-snug">${formatDateTimeMY(summary.latestPbdDate)}</h4>
+                            <p class="text-[11px] text-amber-600 font-semibold mt-1">Terakhir ikut guru/subjek</p>
+                        </div>
+                    </div>
+
+                    <div class="p-5 border-b border-slate-100">
+                        <div class="overflow-x-auto border border-slate-100 rounded-2xl">
+                            <table class="w-full text-left border-collapse text-xs">
+                                <thead>
+                                    <tr class="bg-slate-50 border-b border-slate-100 text-[10px] font-black text-slate-400 uppercase tracking-wider">
+                                        <th class="p-3">Subjek</th>
+                                        <th class="p-3">Guru Mengajar</th>
+                                        <th class="p-3 text-center">Markah</th>
+                                        <th class="p-3 text-center">PBD</th>
+                                        <th class="p-3">Tarikh Markah</th>
+                                        <th class="p-3">Tarikh PBD</th>
+                                        <th class="p-3 text-center">Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-50">
+                                    ${guruKelasSubjectRows || '<tr><td colspan="7" class="p-5 text-center text-slate-400 font-bold">Belum ada data.</td></tr>'}
+                                </tbody>
+                            </table>
                         </div>
                     </div>
 
@@ -3348,6 +3498,9 @@ if (type === 'guru_kelas') {
                 const classYearNum = parseInt(selectedClass.charAt(0)) || 1;
                 const subjectsToUse = baseSubjects;
                 const activeStudents = getStudentsByExactClass(selectedClass);
+                if (!isAdmin && currentUser && currentUser.role === 'Guru') {
+                    selectedTeacher = currentUser.name;
+                }
 
                 content.innerHTML = `
                     <div class="space-y-6">
@@ -3379,8 +3532,10 @@ if (type === 'guru_kelas') {
                             </div>
                             <div class="space-y-1 col-span-2 md:col-span-1">
                                 <label class="text-[10px] font-bold text-gray-400 uppercase">Nama Guru Pentaksir</label>
-                                <select id="sel-teacher" onchange="handleFilterChange()" class="w-full p-2 border border-gray-100 rounded-lg text-xs font-semibold outline-none focus:ring-1 focus:ring-blue-500">
-                                    ${teachers.map(t => `<option value="${t}" ${selectedTeacher===t?'selected':''}>${t}</option>`).join('')}
+                                <select id="sel-teacher" onchange="handleFilterChange()" ${(!isAdmin && currentUser && currentUser.role === 'Guru') ? 'disabled' : ''} class="w-full p-2 border border-gray-100 rounded-lg text-xs font-semibold outline-none focus:ring-1 focus:ring-blue-500 ${(!isAdmin && currentUser && currentUser.role === 'Guru') ? 'bg-slate-50 text-slate-500' : ''}">
+                                    ${(!isAdmin && currentUser && currentUser.role === 'Guru')
+                                        ? `<option value="${currentUser.name}" selected>${currentUser.name}</option>`
+                                        : teachers.map(t => `<option value="${t}" ${selectedTeacher===t?'selected':''}>${t}</option>`).join('')}
                                 </select>
                             </div>
                         </div>
@@ -3421,8 +3576,8 @@ if (type === 'guru_kelas') {
                                     <tbody class="divide-y divide-slate-50 text-xs">
                                         ${activeStudents.map((s, index) => {
                                             const key = `${s.id}_${selectedYear}_${selectedAssessment}_${selectedSubject}`;
-                                            const mark = studentMarks[key] !== undefined ? studentMarks[key] : '';
-                                            const pbd = studentPBD[key] || '';
+                                            const mark = getAssessmentValueForCurrentFilling(markStatusRows, SISMAR_MARK_DRAFT_CACHE_KEY, key, studentMarks);
+                                            const pbd = getAssessmentValueForCurrentFilling(pbdStatusRows, SISMAR_PBD_DRAFT_CACHE_KEY, key, studentPBD);
                                             const gradeResult = calculateUASAGrade(mark);
 
                                             return `
