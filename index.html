@@ -700,6 +700,92 @@
             });
         }
 
+
+        function preserveCurrentAssessmentInputsToMemory() {
+            // Simpan nilai yang sedang ditaip/dipilih dalam memori sebelum render semula.
+            // Ini penting apabila guru klik Mod Kunci/Buka, tukar paparan, atau renderPage() berlaku.
+            const rows = document.querySelectorAll('.student-row');
+            if (!rows || rows.length === 0) return { markRows: [], pbdRows: [] };
+
+            const markRows = [];
+            const pbdRows = [];
+            const now = new Date().toISOString();
+
+            rows.forEach(row => {
+                const sId = row.getAttribute('data-id');
+                if (!sId) return;
+
+                const key = `${sId}_${selectedYear}_${selectedAssessment}_${selectedSubject}`;
+                const keyInfo = parseKey(key);
+                const markInput = row.querySelector('.mark-input');
+                const pbdSelect = row.querySelector('.pbd-select');
+
+                if (markInput) {
+                    const markVal = String(markInput.value || '').trim();
+                    if (markVal !== '') {
+                        const num = parseFloat(markVal);
+                        if (!isNaN(num) && num >= 0 && num <= 100) {
+                            const markRow = {
+                                key,
+                                student_id: String(keyInfo.student_id),
+                                tahun: keyInfo.tahun,
+                                assessment: keyInfo.assessment,
+                                subject: keyInfo.subject,
+                                value: num,
+                                teacher_email: currentUser ? currentUser.email : null,
+                                teacher_name: selectedTeacher,
+                                kelas: canonicalClassName(selectedClass),
+                                updated_at: now
+                            };
+                            studentMarks[key] = num;
+                            markRows.push(markRow);
+                        }
+                    }
+                }
+
+                if (pbdSelect) {
+                    const pbdVal = String(pbdSelect.value || '').trim();
+                    if (pbdVal) {
+                        const pbdRow = {
+                            key,
+                            student_id: String(keyInfo.student_id),
+                            tahun: keyInfo.tahun,
+                            assessment: keyInfo.assessment,
+                            subject: keyInfo.subject,
+                            value: pbdVal,
+                            teacher_email: currentUser ? currentUser.email : null,
+                            teacher_name: selectedTeacher,
+                            kelas: canonicalClassName(selectedClass),
+                            updated_at: now
+                        };
+                        studentPBD[key] = pbdVal;
+                        pbdRows.push(pbdRow);
+                    }
+                }
+            });
+
+            cacheAssessmentRows(SISMAR_MARK_DRAFT_CACHE_KEY, markRows);
+            cacheAssessmentRows(SISMAR_PBD_DRAFT_CACHE_KEY, pbdRows);
+            return { markRows, pbdRows };
+        }
+
+        // Perlindungan umum: apa-apa klik butang/link tidak akan membuang markah yang sedang ditaip.
+        // Nilai semasa disimpan ke memori dan cache dahulu sebelum fungsi butang berjalan.
+        document.addEventListener('click', function(event) {
+            const target = event.target && event.target.closest ? event.target.closest('button, a, [onclick]') : null;
+            if (!target) return;
+            try {
+                preserveCurrentAssessmentInputsToMemory();
+            } catch (err) {
+                console.warn('Gagal menyimpan input sementara sebelum klik butang:', err);
+            }
+        }, true);
+
+        // Perlindungan tambahan sebelum input hilang kerana tukar tab, refresh atau tutup halaman.
+        window.addEventListener('beforeunload', function() {
+            try { preserveCurrentAssessmentInputsToMemory(); } catch (err) {}
+        });
+
         // --- SUPABASE DATABASE SETUP ---
         function parseKey(key) {
             const parts = String(key).split('_');
@@ -1299,6 +1385,7 @@ if (type === 'guru_kelas') {
         }
 
         function navigate(pageId) {
+            preserveCurrentAssessmentInputsToMemory();
             currentPage = pageId;
             document.getElementById('page-title').innerText = pageId.replace(/_/g, ' ');
             
@@ -1464,6 +1551,7 @@ if (type === 'guru_kelas') {
 
         // --- DROPDOWN FILTERS ---
         function handleFilterChange() {
+            preserveCurrentAssessmentInputsToMemory();
             selectedYear = document.getElementById('sel-year').value;
             const newClass = document.getElementById('sel-class').value;
             const newClassYear = parseInt(newClass.charAt(0)) || 1;
@@ -1575,6 +1663,7 @@ if (type === 'guru_kelas') {
         }
 
         function toggleEditMode() {
+            preserveCurrentAssessmentInputsToMemory();
             isEditMode = !isEditMode;
             showToast(isEditMode ? 'Mod Penyuntingan Diaktifkan.' : 'Mod Penyuntingan Dikunci.', isEditMode ? 'info' : 'warning');
             renderPage();
@@ -2838,6 +2927,14 @@ if (type === 'guru_kelas') {
             class="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5">
             <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i> Segar
             </button>
+            <button onclick="printGuruKelasDashboard()"
+            class="px-3 py-2 bg-white border border-purple-100 hover:bg-purple-50 text-purple-700 rounded-xl text-xs font-bold flex items-center gap-1.5">
+            <i data-lucide="printer" class="w-3.5 h-3.5"></i> Print
+            </button>
+            <button onclick="exportGuruKelasCSV()"
+            class="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5">
+            <i data-lucide="file-down" class="w-3.5 h-3.5"></i> Export CSV
+            </button>
                         </div>
                     </div>
 
@@ -2961,7 +3058,111 @@ if (type === 'guru_kelas') {
         }
 
         // --- RENDER DYNAMIC PAGES ---
+
+
+        // --- PRINT & EXPORT CSV TAMBAHAN ---
+        // Fungsi ini hanya menambah butang cetak dan eksport CSV.
+        // Ia tidak mengubah struktur simpanan markah, PBD, dashboard atau Supabase.
+        function csvSafe(value) {
+            const text = String(value ?? '');
+            return '"' + text.replace(/"/g, '""') + '"';
+        }
+
+        function downloadCSVFile(filename, rows) {
+            const csvContent = rows.map(row => row.map(csvSafe).join(',')).join('\n');
+            const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = filename;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+        }
+
+        function printCurrentAssessment() {
+            preserveCurrentAssessmentInputsToMemory();
+            showToast('Paparan sedia untuk dicetak.', 'info');
+            setTimeout(() => window.print(), 150);
+        }
+
+        function exportCurrentAssessmentCSV() {
+            preserveCurrentAssessmentInputsToMemory();
+            const activeStudents = getStudentsByExactClass(selectedClass);
+            const rows = [[
+                'BIL', 'NAMA MURID', 'NO MYKAD', 'KELAS', 'TAHUN', 'PENTAKSIRAN', 'SUBJEK', 'MARKAH', 'GRED', 'PBD', 'GURU PENTAKSIR'
+            ]];
+
+            activeStudents.forEach((student, index) => {
+                const key = `${student.id}_${selectedYear}_${selectedAssessment}_${selectedSubject}`;
+                const mark = studentMarks[key] !== undefined ? studentMarks[key] : '';
+                const pbd = studentPBD[key] || '';
+                const grade = calculateUASAGrade(mark);
+                rows.push([
+                    index + 1,
+                    student.nama || '',
+                    student.ic || '',
+                    canonicalClassName(selectedClass),
+                    selectedYear,
+                    selectedAssessment,
+                    selectedSubject,
+                    mark,
+                    grade.grade === '-' ? '' : `${grade.grade} (${grade.label})`,
+                    pbd,
+                    selectedTeacher || ''
+                ]);
+            });
+
+            const filename = `SISMAR_${canonicalClassName(selectedClass)}_${selectedSubject}_${selectedAssessment}_${selectedYear}.csv`.replace(/\s+/g, '_').replace(/[^A-Z0-9_\-.]/gi, '');
+            downloadCSVFile(filename, rows);
+            showToast('CSV pengisian markah berjaya dieksport.', 'success');
+        }
+
+        function printGuruKelasDashboard() {
+            preserveCurrentAssessmentInputsToMemory();
+            showToast('Dashboard Guru Kelas sedia untuk dicetak.', 'info');
+            setTimeout(() => window.print(), 150);
+        }
+
+        function exportGuruKelasCSV() {
+            preserveCurrentAssessmentInputsToMemory();
+            const kelasName = guruKelasSelectedClass || (currentUser && currentUser.kelas) || selectedClass;
+            const classStudents = getStudentsByExactClass(kelasName);
+            const rows = [[
+                'BIL', 'NAMA MURID', 'NO MYKAD', 'KELAS', 'TAHUN', 'PENTAKSIRAN', 'SUBJEK', 'MARKAH', 'GRED', 'PBD'
+            ]];
+            const subjectList = getSubjectsForClass(kelasName);
+
+            classStudents.forEach((student, index) => {
+                subjectList.forEach(subject => {
+                    const key = `${student.id}_${selectedYear}_${selectedAssessment}_${subject}`;
+                    const mark = studentMarks[key] !== undefined ? studentMarks[key] : '';
+                    const pbd = studentPBD[key] || '';
+                    const grade = calculateUASAGrade(mark);
+                    rows.push([
+                        index + 1,
+                        student.nama || '',
+                        student.ic || '',
+                        canonicalClassName(kelasName),
+                        selectedYear,
+                        selectedAssessment,
+                        subject,
+                        mark,
+                        grade.grade === '-' ? '' : `${grade.grade} (${grade.label})`,
+                        pbd
+                    ]);
+                });
+            });
+
+            const filename = `SISMAR_Dashboard_Guru_Kelas_${canonicalClassName(kelasName)}_${selectedAssessment}_${selectedYear}.csv`.replace(/\s+/g, '_').replace(/[^A-Z0-9_\-.]/gi, '');
+            downloadCSVFile(filename, rows);
+            showToast('CSV Dashboard Guru Kelas berjaya dieksport.', 'success');
+        }
+
         function renderPage() {
+            // Pastikan render semula tidak memadam markah yang sedang ditaip.
+            try { preserveCurrentAssessmentInputsToMemory(); } catch (err) {}
             const content = document.getElementById('page-content');
             if (!content) return;
             if (!currentUser) {
@@ -3192,9 +3393,15 @@ if (type === 'guru_kelas') {
                                     Prestasi Murid: ${selectedClass} (${activeStudents.length} Murid)
                                 </h3>
                                 ${activeStudents.length === 0 && String(selectedClass).startsWith('4 ') ? `<span class="text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-100 px-3 py-1 rounded-full">Jika murid Tahun 4 kosong, semak data murid supaya kelas tidak digabungkan.</span>` : ''}
-                                <div class="flex items-center gap-2">
+                                <div class="flex flex-wrap items-center gap-2 no-print">
                                     <button onclick="toggleEditMode()" class="px-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-700 hover:bg-slate-50 transition-all flex items-center gap-1">
                                         <i data-lucide="${isEditMode ? 'lock' : 'unlock'}" class="w-3.5 h-3.5"></i> ${isEditMode ? 'Kunci Mod' : 'Kemaskini'}
+                                    </button>
+                                    <button onclick="printCurrentAssessment()" class="px-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-700 hover:bg-slate-50 transition-all flex items-center gap-1">
+                                        <i data-lucide="printer" class="w-3.5 h-3.5"></i> Print
+                                    </button>
+                                    <button onclick="exportCurrentAssessmentCSV()" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1">
+                                        <i data-lucide="file-down" class="w-3.5 h-3.5"></i> Export CSV
                                     </button>
                                 </div>
                             </div>
