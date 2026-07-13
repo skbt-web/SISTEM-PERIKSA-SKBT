@@ -1386,13 +1386,13 @@ if (type === 'guru_kelas') {
             // Diletakkan di luar syarat peranan supaya sentiasa dipaparkan selepas log masuk.
             html += `
             <button onclick="navigate('borang_diskusi_akauntabaliti')" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all" data-page="borang_diskusi_akauntabaliti">
-                <i data-lucide="presentation"></i><span>BORANG DISKUSI AKAUNTABALITI</span>
+                <i data-lucide="presentation"></i><span>BORANG DA</span>
             </button>
             <button onclick="navigate('bank_soalan')" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all" data-page="bank_soalan">
                 <i data-lucide="library-big"></i><span>BANK SOALAN</span>
             </button>
             <button onclick="navigate('rekod_perkembangan_murid')" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all" data-page="rekod_perkembangan_murid">
-                <i data-lucide="notebook-tabs"></i><span>REKOD PERKEMBANGAN MURID</span>
+                <i data-lucide="notebook-tabs"></i><span>RPM</span>
             </button>`;
 
             html += `
@@ -3585,6 +3585,41 @@ if (type === 'guru_kelas') {
         const resourceLinksLoaded = { bank: false, rekod: false };
         const resourceLinksLoading = { bank: false, rekod: false };
 
+
+        // ================================================================
+        // PAUTAN DIISI TERUS DALAM HTML
+        // Gantikan teks kosong '' dengan URL sebenar yang bermula dengan https://
+        // Bahagian ini berasingan daripada markah, PBD, murid dan Supabase.
+        // ================================================================
+        const SISMAR_HTML_RESOURCE_LINKS = {
+            bank: {
+                'BAHASA MELAYU': 'https://drive.google.com/drive/folders/1LWcZcYeouLbsoBg6x5vckE6NDNl7vJR-?usp=sharing',
+                'BAHASA INGGERIS': 'https://drive.google.com/drive/folders/1k0Afz0yW6KAp19LBjkte9VwOrJzHc6sn?usp=drive_link',
+                'MATEMATIK': 'https://drive.google.com/drive/folders/1JneXroGBsf9MMdNDgKbSNU8B6NaK16Cn?usp=drive_link',
+                'SAINS': 'https://drive.google.com/drive/folders/1yTf3yXqSEVFnUHm8M-ekA_IIAnH7GWy4?usp=drive_link',
+                'PENDIDIKAN ISLAM': 'https://drive.google.com/drive/folders/1yHc3yPNS7-hX593bTaMwiz_J38_DsJyh?usp=drive_link',
+                'SEJARAH': 'https://drive.google.com/drive/folders/1efVeFXTWL3pBZmR3y8171_IlW6eVvReb?usp=drive_link',
+                'REKA BENTUK DAN TEKNOLOGI': 'https://drive.google.com/drive/folders/1b4XjVIlJcIgdH8LJyj6EQ89B8RSXf3I_?usp=drive_link',
+                'PENDIDIKAN JASMANI DAN PENDIDIKAN KESIHATAN': 'https://drive.google.com/drive/folders/1nqP_6mQPmLsgkAOQcHf31iFivT5rGprI?usp=drive_link',
+                'PENDIDIKAN SENI VISUAL': 'https://drive.google.com/drive/folders/1fX-U0pDFnXwRxMG-fPbQfNOKlN0yyYeL?usp=drive_link',
+                'PENDIDIKAN MUZIK': 'https://drive.google.com/drive/folders/1MQNJpjjZkPCU7JwiLzmXCYhe7uyZ_3oW?usp=drive_link',
+                'BAHASA ARAB': 'https://drive.google.com/drive/folders/1cKz6aOveaBLwc9skNBWZ5qCBqpdKzd0x?usp=drive_link'
+            },
+            rekod: {
+                'BAHASA MELAYU': 'https://drive.google.com/drive/folders/1k1Ot0t9qfm4kOhU1NslIETh7Z1Y4RyIT?usp=drive_link',
+                'BAHASA INGGERIS': 'https://drive.google.com/drive/folders/1zEpih83vowh1acT6KIL4BayGibstvdp3?usp=drive_link',
+                'MATEMATIK': 'https://drive.google.com/drive/folders/1_SI8md_YaFS3u6xINsF103wC4Nz7nVHz?usp=drive_link',
+                'SAINS': 'https://drive.google.com/drive/folders/142nRu-y-epXlMrkHXZ9RS3e-qENkCvRh?usp=drive_link',
+                'PENDIDIKAN ISLAM': 'https://drive.google.com/drive/folders/19eEdYYeFk4ci-y73X0aJew5kUOXvHHEO?usp=drive_link',
+                'SEJARAH': 'https://drive.google.com/drive/folders/16bXpB__1IOwpN2SPE_9k8z_4qYTrFbot?usp=drive_link',
+                'REKA BENTUK DAN TEKNOLOGI': 'https://drive.google.com/drive/folders/13SYTbcKPQG_z1yxTqQQCSmFwLuVHe1b9?usp=drive_link',
+                'PENDIDIKAN JASMANI DAN PENDIDIKAN KESIHATAN': 'https://drive.google.com/drive/folders/1R8PgwPzbh6BHWHwwgSa23O7rPkNmVilV?usp=drive_link',
+                'PENDIDIKAN SENI VISUAL': 'https://drive.google.com/drive/folders/1Ibo9FfHwXId5BNljp-WhxxxLVGCDvBhM?usp=drive_link',
+                'PENDIDIKAN MUZIK': 'https://drive.google.com/drive/folders/1gX0x0_SZSYsj78qNyMKYB5jVfobIG-un?usp=drive_link',
+                'BAHASA ARAB': 'https://drive.google.com/drive/folders/1AJPKGY9RKX9O7Ift8GNanmNuBIzzcXIN?usp=drive_link'
+            }
+        };
+
         function getResourceTypeFromStorageKey(storageKey) {
             return storageKey === SISMAR_BANK_LINKS_KEY ? 'bank' : 'rekod';
         }
@@ -3720,44 +3755,45 @@ if (type === 'guru_kelas') {
             return `${prefix}-link-${index}`;
         }
 
+        function openHtmlResourceLink(type, subject) {
+            const url = String((SISMAR_HTML_RESOURCE_LINKS[type] || {})[subject] || '').trim();
+            if (!url) {
+                showToast(`Pautan ${subject} belum diisi dalam HTML.`, 'warning');
+                return;
+            }
+            if (!/^https?:\/\//i.test(url)) {
+                showToast(`Pautan ${subject} tidak sah. Gunakan http:// atau https://`, 'warning');
+                return;
+            }
+            window.open(url, '_blank', 'noopener,noreferrer');
+        }
+
         function renderSubjectResourcePage(type) {
             const isBank = type === 'bank';
-            // Paparkan cache serta-merta, kemudian selaraskan dengan Supabase.
-            if (!resourceLinksLoaded[type] && !resourceLinksLoading[type]) {
-                setTimeout(() => loadResourceLinksFromSupabase(type), 0);
-            }
-            const storageKey = isBank ? SISMAR_BANK_LINKS_KEY : SISMAR_REKOD_LINKS_KEY;
             const title = isBank ? 'BANK SOALAN' : 'REKOD PERKEMBANGAN MURID';
             const subtitle = isBank
-                ? 'Simpan dan buka pautan bank soalan bagi setiap mata pelajaran.'
-                : 'Simpan dan buka pautan rekod perkembangan murid bagi setiap mata pelajaran.';
+                ? 'Senarai pautan bank soalan mengikut mata pelajaran.'
+                : 'Senarai pautan rekod perkembangan murid mengikut mata pelajaran.';
             const icon = isBank ? 'library-big' : 'notebook-tabs';
-            const prefix = isBank ? 'bank' : 'rekod';
-            const links = readResourceLinks(storageKey);
-            const cards = SISMAR_RESOURCE_SUBJECTS.map((subject, index) => {
-                const inputId = resourceInputId(prefix, index);
-                const url = links[subject] || '';
+            const links = SISMAR_HTML_RESOURCE_LINKS[type] || {};
+
+            const rows = SISMAR_RESOURCE_SUBJECTS.map((subject, index) => {
+                const url = String(links[subject] || '').trim();
+                const buttonClass = url
+                    ? (isBank ? 'bg-blue-600 hover:bg-blue-700' : 'bg-emerald-600 hover:bg-emerald-700')
+                    : 'bg-slate-300 cursor-not-allowed';
+                const buttonText = url ? 'Buka Pautan' : 'Belum Diisi';
                 return `
-                    <div class="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm space-y-3">
-                        <div class="flex items-start justify-between gap-3">
-                            <div class="flex items-center gap-3 min-w-0">
-                                <div class="${isBank ? 'bg-blue-50 text-blue-700' : 'bg-emerald-50 text-emerald-700'} p-2.5 rounded-xl shrink-0">
-                                    <i data-lucide="book-open-check" class="w-5 h-5"></i>
-                                </div>
-                                <p class="text-xs font-extrabold text-slate-800 leading-snug">${subject}</p>
-                            </div>
-                            <span class="text-[9px] px-2 py-1 rounded-full font-bold ${url ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}">${url ? 'PAUTAN TERSEDIA' : 'BELUM DIISI'}</span>
-                        </div>
-                        <input id="${inputId}" type="url" value="${escapeHtml(url)}" placeholder="https://..." class="w-full p-2.5 border border-slate-200 rounded-xl text-xs outline-none focus:ring-2 focus:ring-blue-500">
-                        <div class="grid grid-cols-2 gap-2">
-                            <button onclick="saveResourceLink('${storageKey}', ${JSON.stringify(subject)}, '${inputId}')" class="px-3 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-900 text-white text-[11px] font-bold transition-all flex items-center justify-center gap-1.5">
-                                <i data-lucide="save" class="w-3.5 h-3.5"></i> Simpan Pautan
+                    <tr class="hover:bg-slate-50 transition-colors">
+                        <td class="border border-slate-200 px-4 py-3 text-center text-xs font-bold text-slate-700">${index + 1}</td>
+                        <td class="border border-slate-200 px-4 py-3 text-xs font-extrabold text-slate-800">${subject}</td>
+                        <td class="border border-slate-200 px-4 py-3 text-center">
+                            <button onclick="openHtmlResourceLink('${type}', ${JSON.stringify(subject)})"
+                                class="inline-flex items-center justify-center gap-2 min-w-[130px] px-4 py-2.5 rounded-xl text-white text-[11px] font-bold transition-all ${buttonClass}">
+                                <i data-lucide="external-link" class="w-4 h-4"></i> ${buttonText}
                             </button>
-                            <button onclick="openResourceLink('${storageKey}', ${JSON.stringify(subject)})" class="px-3 py-2.5 rounded-xl ${isBank ? 'bg-blue-600 hover:bg-blue-700' : 'bg-emerald-600 hover:bg-emerald-700'} text-white text-[11px] font-bold transition-all flex items-center justify-center gap-1.5">
-                                <i data-lucide="external-link" class="w-3.5 h-3.5"></i> Buka
-                            </button>
-                        </div>
-                    </div>`;
+                        </td>
+                    </tr>`;
             }).join('');
 
             document.getElementById('page-content').innerHTML = `
@@ -3766,11 +3802,24 @@ if (type === 'guru_kelas') {
                         <div class="relative z-10">
                             <h3 class="text-xl font-black">${title}</h3>
                             <p class="text-xs mt-1 opacity-90 font-medium">${subtitle}</p>
-                            <p class="text-[10px] mt-3 opacity-75">Pautan disimpan dalam Supabase serta cache tempatan. Markah dan data PBD tidak terjejas.</p>
                         </div>
                         <i data-lucide="${icon}" class="absolute right-6 bottom-3 w-24 h-24 opacity-10"></i>
                     </div>
-                    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">${cards}</div>
+
+                    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                        <div class="overflow-x-auto">
+                            <table class="w-full border-collapse">
+                                <thead>
+                                    <tr class="${isBank ? 'bg-blue-50 text-blue-900' : 'bg-emerald-50 text-emerald-900'}">
+                                        <th class="border border-slate-200 px-4 py-3 text-center text-xs font-black w-20">BIL.</th>
+                                        <th class="border border-slate-200 px-4 py-3 text-left text-xs font-black">SUBJEK</th>
+                                        <th class="border border-slate-200 px-4 py-3 text-center text-xs font-black w-52">BUKA PAUTAN</th>
+                                    </tr>
+                                </thead>
+                                <tbody>${rows}</tbody>
+                            </table>
+                        </div>
+                    </div>
                 </div>`;
         }
 
