@@ -3612,16 +3612,16 @@ if (type === 'guru_kelas') {
         const SISMAR_HTML_RESOURCE_LINKS = {
             bank: {
                 'BAHASA MELAYU': 'https://drive.google.com/drive/folders/1LWcZcYeouLbsoBg6x5vckE6NDNl7vJR-?usp=sharing',
-                'BAHASA INGGERIS': 'https://drive.google.com/drive/folders/1k0Afz0yW6KAp19LBjkte9VwOrJzHc6sn?usp=sharing',
-                'MATEMATIK': 'https://drive.google.com/drive/folders/1JneXroGBsf9MMdNDgKbSNU8B6NaK16Cn?usp=sharing',
-                'SAINS': 'https://drive.google.com/drive/folders/1yTf3yXqSEVFnUHm8M-ekA_IIAnH7GWy4?usp=sharing',
-                'PENDIDIKAN ISLAM': 'https://drive.google.com/drive/folders/1yHc3yPNS7-hX593bTaMwiz_J38_DsJyh?usp=sharing',
-                'SEJARAH': 'https://drive.google.com/drive/folders/1efVeFXTWL3pBZmR3y8171_IlW6eVvReb?usp=sharing',
-                'REKA BENTUK DAN TEKNOLOGI': 'https://drive.google.com/drive/folders/1b4XjVIlJcIgdH8LJyj6EQ89B8RSXf3I_?usp=sharing',
-                'PENDIDIKAN JASMANI DAN PENDIDIKAN KESIHATAN': 'https://drive.google.com/drive/folders/1nqP_6mQPmLsgkAOQcHf31iFivT5rGprI?usp=sharing',
-                'PENDIDIKAN SENI VISUAL': 'https://drive.google.com/drive/folders/1fX-U0pDFnXwRxMG-fPbQfNOKlN0yyYeL?usp=sharing',
-                'PENDIDIKAN MUZIK': 'https://drive.google.com/drive/folders/1MQNJpjjZkPCU7JwiLzmXCYhe7uyZ_3oW?usp=sharing',
-                'BAHASA ARAB': 'https://drive.google.com/drive/folders/1cKz6aOveaBLwc9skNBWZ5qCBqpdKzd0x?usp=sharing'
+                'BAHASA INGGERIS': 'https://drive.google.com/drive/folders/1k0Afz0yW6KAp19LBjkte9VwOrJzHc6sn?usp=drive_link',
+                'MATEMATIK': 'https://drive.google.com/drive/folders/1JneXroGBsf9MMdNDgKbSNU8B6NaK16Cn?usp=drive_link',
+                'SAINS': 'https://drive.google.com/drive/folders/1yTf3yXqSEVFnUHm8M-ekA_IIAnH7GWy4?usp=drive_link',
+                'PENDIDIKAN ISLAM': 'https://drive.google.com/drive/folders/1yHc3yPNS7-hX593bTaMwiz_J38_DsJyh?usp=drive_link',
+                'SEJARAH': 'https://drive.google.com/drive/folders/1efVeFXTWL3pBZmR3y8171_IlW6eVvReb?usp=drive_link',
+                'REKA BENTUK DAN TEKNOLOGI': 'https://drive.google.com/drive/folders/1b4XjVIlJcIgdH8LJyj6EQ89B8RSXf3I_?usp=drive_link',
+                'PENDIDIKAN JASMANI DAN PENDIDIKAN KESIHATAN': 'https://drive.google.com/drive/folders/1nqP_6mQPmLsgkAOQcHf31iFivT5rGprI?usp=drive_link',
+                'PENDIDIKAN SENI VISUAL': 'https://drive.google.com/drive/folders/1fX-U0pDFnXwRxMG-fPbQfNOKlN0yyYeL?usp=drive_link',
+                'PENDIDIKAN MUZIK': 'https://drive.google.com/drive/folders/1MQNJpjjZkPCU7JwiLzmXCYhe7uyZ_3oW?usp=drive_link',
+                'BAHASA ARAB': 'https://drive.google.com/drive/folders/1cKz6aOveaBLwc9skNBWZ5qCBqpdKzd0x?usp=drive_link'
             },
             rekod: {
                 'BAHASA MELAYU': 'https://drive.google.com/drive/folders/1k1Ot0t9qfm4kOhU1NslIETh7Z1Y4RyIT?usp=drive_link',
@@ -3801,15 +3801,22 @@ if (type === 'guru_kelas') {
                     ? (isBank ? 'bg-blue-600 hover:bg-blue-700' : 'bg-emerald-600 hover:bg-emerald-700')
                     : 'bg-slate-300 cursor-not-allowed';
                 const buttonText = url ? 'Buka Pautan' : 'Belum Diisi';
+                const linkControl = url
+                    ? `<a href="${url}" target="_blank" rel="noopener noreferrer"
+                            class="inline-flex items-center justify-center gap-2 min-w-[130px] px-4 py-2.5 rounded-xl text-white text-[11px] font-bold transition-all ${buttonClass}"
+                            title="Buka ${subject} dalam tab baharu">
+                            <i data-lucide="external-link" class="w-4 h-4"></i> ${buttonText}
+                       </a>`
+                    : `<button type="button" disabled
+                            class="inline-flex items-center justify-center gap-2 min-w-[130px] px-4 py-2.5 rounded-xl text-white text-[11px] font-bold transition-all ${buttonClass}">
+                            <i data-lucide="external-link" class="w-4 h-4"></i> ${buttonText}
+                       </button>`;
                 return `
                     <tr class="hover:bg-slate-50 transition-colors">
                         <td class="border border-slate-200 px-4 py-3 text-center text-xs font-bold text-slate-700">${index + 1}</td>
                         <td class="border border-slate-200 px-4 py-3 text-xs font-extrabold text-slate-800">${subject}</td>
                         <td class="border border-slate-200 px-4 py-3 text-center">
-                            <button onclick="openHtmlResourceLink('${type}', ${JSON.stringify(subject)})"
-                                class="inline-flex items-center justify-center gap-2 min-w-[130px] px-4 py-2.5 rounded-xl text-white text-[11px] font-bold transition-all ${buttonClass}">
-                                <i data-lucide="external-link" class="w-4 h-4"></i> ${buttonText}
-                            </button>
+                            ${linkControl}
                         </td>
                     </tr>`;
             }).join('');
