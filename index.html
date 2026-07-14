@@ -3268,281 +3268,299 @@ if (type === 'guru_kelas') {
 
 
         // --- SISMAR AI ENGINE ---
-        // Struktur asal dikekalkan. Modul ini hanya membaca data sedia ada dan memaparkan analisis.
-        let sismarAISelectedMode = 'sekolah';
+        // Modul ini hanya membaca data markah/PBD sedia ada. Tiada markah dipadam atau diubah.
+        const SISMAR_AI_FUNCTION_NAME = 'hyper-processor';
+        const SISMAR_AI_STORAGE_KEY = 'sismar_ai_interventions_v2';
+        let sismarAISelectedMode = 'subjek';
         let sismarAIResult = '';
+        let sismarAISelectedYear = selectedYear;
+        let sismarAISelectedAssessment = selectedAssessment;
+        let sismarAISelectedClass = selectedClass;
+        let sismarAISelectedSubject = selectedSubject;
+        let sismarAISelectedStudentId = '';
+        let sismarAISelectedTopic = '';
+        let sismarAIQuestionCount = 10;
+        let sismarAIQuestionType = 'Campuran';
 
-        function getStudentSubjectMarks(studentId, year = selectedYear, assessment = selectedAssessment) {
-            return baseSubjects.map(subject => {
-                const key = `${studentId}_${year}_${assessment}_${subject}`;
-                const mark = studentMarks[key];
-                const pbd = studentPBD[key] || '';
-                return {
-                    subject,
-                    mark: mark === undefined || mark === '' ? null : Number(mark),
-                    pbd
-                };
-            });
-        }
-
-        function getStudentAverageAI(studentId, year = selectedYear, assessment = selectedAssessment) {
-            const marks = getStudentSubjectMarks(studentId, year, assessment).filter(item => Number.isFinite(item.mark));
-            if (marks.length === 0) return 0;
-            return marks.reduce((sum, item) => sum + item.mark, 0) / marks.length;
-        }
-
-        function getStudentRiskAI(student, year = selectedYear, assessment = selectedAssessment) {
-            const average = getStudentAverageAI(student.id, year, assessment);
-            const subjectRows = getStudentSubjectMarks(student.id, year, assessment);
-            const lowSubjects = subjectRows.filter(item => Number.isFinite(item.mark) && item.mark < 40).map(item => item.subject);
-            const lowTP = subjectRows.filter(item => ['TP1', 'TP2'].includes(item.pbd)).map(item => item.subject);
-
-            if (average > 0 && (average < 40 || lowSubjects.length >= 2 || lowTP.length >= 2)) {
-                return {
-                    tahap: 'Risiko Tinggi',
-                    badge: 'bg-rose-100 text-rose-700 border-rose-200',
-                    cadangan: 'Intervensi segera, bimbingan kumpulan kecil dan pemantauan mingguan.',
-                    sebab: lowSubjects.length ? `Markah rendah dalam ${lowSubjects.slice(0, 3).join(', ')}.` : 'Tahap penguasaan masih rendah.'
-                };
-            }
-
-            if (average > 0 && (average < 60 || lowSubjects.length === 1 || lowTP.length === 1)) {
-                return {
-                    tahap: 'Risiko Sederhana',
-                    badge: 'bg-amber-100 text-amber-700 border-amber-200',
-                    cadangan: 'Latihan pengukuhan, semakan latihan dan ujian semula selepas dua minggu.',
-                    sebab: lowSubjects.length ? `Perlu pengukuhan dalam ${lowSubjects.slice(0, 3).join(', ')}.` : 'Prestasi belum stabil.'
-                };
-            }
-
-            return {
-                tahap: average === 0 ? 'Belum Cukup Data' : 'Risiko Rendah',
-                badge: average === 0 ? 'bg-slate-100 text-slate-600 border-slate-200' : 'bg-emerald-100 text-emerald-700 border-emerald-200',
-                cadangan: average === 0 ? 'Lengkapkan markah dan TP sebelum analisis penuh dibuat.' : 'Teruskan latihan pengayaan dan soalan aras tinggi.',
-                sebab: average === 0 ? 'Data markah belum mencukupi.' : 'Prestasi stabil.'
-            };
+        function getSismarAIStudentRows(kelas = sismarAISelectedClass, subject = sismarAISelectedSubject, year = sismarAISelectedYear, assessment = sismarAISelectedAssessment) {
+            return getStudentsByExactClass(kelas).map(student => {
+                const key = `${student.id}_${year}_${assessment}_${subject}`;
+                const rawMark = studentMarks[key];
+                const mark = rawMark === undefined || rawMark === '' ? null : Number(rawMark);
+                const pbd = String(studentPBD[key] || '').toUpperCase();
+                const tpNumber = Number((pbd.match(/\d+/) || [0])[0]);
+                let risk = 'Belum Cukup Data';
+                if (Number.isFinite(mark) || tpNumber) {
+                    if ((Number.isFinite(mark) && mark < 40) || (tpNumber > 0 && tpNumber <= 2)) risk = 'Risiko Tinggi';
+                    else if ((Number.isFinite(mark) && mark < 65) || tpNumber === 3) risk = 'Risiko Sederhana';
+                    else risk = 'Risiko Rendah';
+                }
+                return { id: student.id, nama: student.nama, kelas: student.kelas, mark, pbd: pbd || '-', risk };
+            }).filter(row => row.mark !== null || row.pbd !== '-');
         }
 
         function getSismarAISnapshot() {
-            const rows = students.map(s => {
-                const average = getStudentAverageAI(s.id);
-                const risk = getStudentRiskAI(s);
-                return {
-                    id: s.id,
-                    nama: s.nama,
-                    kelas: s.kelas,
-                    purata: Number(average.toFixed(1)),
-                    risiko: risk.tahap,
-                    sebab: risk.sebab,
-                    cadangan: risk.cadangan,
-                    subjects: getStudentSubjectMarks(s.id).filter(item => item.mark !== null || item.pbd)
-                };
-            });
-
-            const withMarks = rows.filter(r => r.purata > 0);
-            const schoolAverage = withMarks.length ? withMarks.reduce((sum, r) => sum + r.purata, 0) / withMarks.length : 0;
-            const highRisk = rows.filter(r => r.risiko === 'Risiko Tinggi');
-            const mediumRisk = rows.filter(r => r.risiko === 'Risiko Sederhana');
-            const lowRisk = rows.filter(r => r.risiko === 'Risiko Rendah');
-
-            const subjectStats = baseSubjects.map(subject => {
-                const values = students.map(s => {
-                    const key = `${s.id}_${selectedYear}_${selectedAssessment}_${subject}`;
-                    const mark = studentMarks[key];
-                    return mark === undefined || mark === '' ? null : Number(mark);
-                }).filter(v => Number.isFinite(v));
-                const avg = values.length ? values.reduce((a, b) => a + b, 0) / values.length : 0;
-                return { subject, average: Number(avg.toFixed(1)), count: values.length };
-            }).filter(x => x.count > 0).sort((a, b) => a.average - b.average);
-
+            const rows = getSismarAIStudentRows();
+            const marks = rows.map(r => r.mark).filter(Number.isFinite);
+            const average = marks.length ? marks.reduce((a, b) => a + b, 0) / marks.length : 0;
+            const tpCounts = { TP1: 0, TP2: 0, TP3: 0, TP4: 0, TP5: 0, TP6: 0 };
+            rows.forEach(r => { if (Object.prototype.hasOwnProperty.call(tpCounts, r.pbd)) tpCounts[r.pbd]++; });
             return {
-                tahun: selectedYear,
-                assessment: selectedAssessment,
-                jumlahMurid: students.length,
-                jumlahDataMarkah: withMarks.length,
-                purataSekolah: Number(schoolAverage.toFixed(1)),
-                risikoTinggi: highRisk,
-                risikoSederhana: mediumRisk,
-                risikoRendah: lowRisk,
-                subjectStats,
+                tahun: sismarAISelectedYear,
+                assessment: sismarAISelectedAssessment,
+                kelas: sismarAISelectedClass,
+                subject: sismarAISelectedSubject,
+                jumlahMurid: rows.length,
+                jumlahMarkah: marks.length,
+                purata: Number(average.toFixed(1)),
+                tertinggi: marks.length ? Math.max(...marks) : 0,
+                terendah: marks.length ? Math.min(...marks) : 0,
+                risikoTinggi: rows.filter(r => r.risk === 'Risiko Tinggi'),
+                risikoSederhana: rows.filter(r => r.risk === 'Risiko Sederhana'),
+                risikoRendah: rows.filter(r => r.risk === 'Risiko Rendah'),
+                tpCounts,
                 murid: rows
             };
         }
 
-        function renderSismarAIPage() {
-            const snapshot = getSismarAISnapshot();
-            const weakest = snapshot.subjectStats[0];
-            const best = snapshot.subjectStats[snapshot.subjectStats.length - 1];
-            const topRiskRows = [...snapshot.risikoTinggi, ...snapshot.risikoSederhana].slice(0, 8);
-
-            return `
-                <div class="space-y-6">
-                    <div class="bg-gradient-to-r from-indigo-600 via-blue-600 to-cyan-600 text-white p-6 md:p-8 rounded-3xl shadow-sm relative overflow-hidden">
-                        <div class="relative z-10 space-y-2">
-                            <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/15 border border-white/20 text-[10px] font-black uppercase tracking-wider">
-                                <i data-lucide="sparkles" class="w-3.5 h-3.5"></i> SISMAR AI Engine
-                            </div>
-                            <h3 class="text-2xl md:text-3xl font-black tracking-tight">AI Decision Support System</h3>
-                            <p class="text-sm text-blue-50 font-medium max-w-3xl">Analisis automatik prestasi murid, risiko akademik, cadangan intervensi, laporan ibu bapa dan ringkasan pentadbir berdasarkan data markah dan PBD sedia ada.</p>
-                        </div>
-                        <i data-lucide="brain-circuit" class="absolute right-6 bottom-4 w-32 h-32 opacity-10"></i>
-                    </div>
-
-                    <div class="grid grid-cols-1 sm:grid-cols-4 gap-4">
-                        <div class="bg-white p-5 rounded-2xl border border-blue-100 shadow-sm">
-                            <p class="text-[10px] font-black text-slate-400 uppercase">Purata Sekolah</p>
-                            <h4 class="text-2xl font-black text-slate-800">${snapshot.purataSekolah}%</h4>
-                        </div>
-                        <div class="bg-white p-5 rounded-2xl border border-rose-100 shadow-sm">
-                            <p class="text-[10px] font-black text-rose-400 uppercase">Risiko Tinggi</p>
-                            <h4 class="text-2xl font-black text-rose-700">${snapshot.risikoTinggi.length}</h4>
-                        </div>
-                        <div class="bg-white p-5 rounded-2xl border border-amber-100 shadow-sm">
-                            <p class="text-[10px] font-black text-amber-400 uppercase">Risiko Sederhana</p>
-                            <h4 class="text-2xl font-black text-amber-700">${snapshot.risikoSederhana.length}</h4>
-                        </div>
-                        <div class="bg-white p-5 rounded-2xl border border-emerald-100 shadow-sm">
-                            <p class="text-[10px] font-black text-emerald-400 uppercase">Risiko Rendah</p>
-                            <h4 class="text-2xl font-black text-emerald-700">${snapshot.risikoRendah.length}</h4>
-                        </div>
-                    </div>
-
-                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                        <div class="lg:col-span-2 bg-white rounded-3xl border border-blue-100 shadow-sm overflow-hidden">
-                            <div class="p-5 border-b border-slate-100 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-                                <div>
-                                    <h3 class="font-black text-slate-800 flex items-center gap-2"><i data-lucide="bot" class="w-5 h-5 text-blue-600"></i> Jana Analisis AI</h3>
-                                    <p class="text-xs text-slate-500 font-medium">Pilih jenis laporan. Gemini akan digunakan melalui Supabase Edge Function jika tersedia.</p>
-                                </div>
-                                <button onclick="runSismarAI()" id="sismar-ai-run-btn" class="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-black flex items-center justify-center gap-2 shadow-sm">
-                                    <i data-lucide="sparkles" class="w-4 h-4"></i> JANA AI
-                                </button>
-                            </div>
-                            <div class="p-5 space-y-4">
-                                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                    <select id="sismar-ai-mode" onchange="sismarAISelectedMode=this.value" class="p-3 border border-slate-200 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-blue-500">
-                                        <option value="sekolah" ${sismarAISelectedMode==='sekolah'?'selected':''}>AI Ringkasan Guru Besar</option>
-                                        <option value="kelas" ${sismarAISelectedMode==='kelas'?'selected':''}>AI Analisis Kelas</option>
-                                        <option value="subjek" ${sismarAISelectedMode==='subjek'?'selected':''}>AI Analisis Subjek</option>
-                                        <option value="intervensi" ${sismarAISelectedMode==='intervensi'?'selected':''}>AI Pelan Intervensi</option>
-                                        <option value="ibu_bapa" ${sismarAISelectedMode==='ibu_bapa'?'selected':''}>AI Laporan Ibu Bapa</option>
-                                        <option value="chat" ${sismarAISelectedMode==='chat'?'selected':''}>AI Chat Assistant</option>
-                                    </select>
-                                    <input id="sismar-ai-question" class="p-3 border border-slate-200 rounded-xl text-xs font-semibold outline-none focus:ring-2 focus:ring-blue-500" placeholder="Contoh: Murid mana perlu intervensi segera?">
-                                </div>
-                                <div id="sismar-ai-output" class="min-h-[260px] bg-slate-50 border border-slate-100 rounded-2xl p-5 text-sm text-slate-700 leading-relaxed whitespace-pre-wrap font-medium">${sismarAIResult || 'Klik JANA AI untuk menghasilkan analisis. Sistem masih boleh menjana analisis asas walaupun Gemini belum disambungkan.'}</div>
-                                <div class="flex flex-wrap gap-2">
-                                    <button onclick="copySismarAIResult()" class="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-xs font-black flex items-center gap-2"><i data-lucide="copy" class="w-4 h-4"></i> SALIN</button>
-                                    <button onclick="printReport()" class="px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-black flex items-center gap-2"><i data-lucide="printer" class="w-4 h-4"></i> CETAK</button>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="space-y-4">
-                            <div class="bg-white p-5 rounded-3xl border border-blue-100 shadow-sm space-y-2">
-                                <h3 class="font-black text-slate-800 text-sm">Insight Pantas</h3>
-                                <p class="text-xs text-slate-500 font-semibold">Subjek terbaik: <b>${best ? best.subject + ' (' + best.average + '%)' : '-'}</b></p>
-                                <p class="text-xs text-slate-500 font-semibold">Subjek lemah: <b>${weakest ? weakest.subject + ' (' + weakest.average + '%)' : '-'}</b></p>
-                                <p class="text-xs text-slate-500 font-semibold">Data markah dianalisis: <b>${snapshot.jumlahDataMarkah}</b> murid</p>
-                            </div>
-                            <div class="bg-white rounded-3xl border border-blue-100 shadow-sm overflow-hidden">
-                                <div class="p-4 border-b border-slate-100">
-                                    <h3 class="font-black text-slate-800 text-sm">Senarai Risiko</h3>
-                                </div>
-                                <div class="max-h-[360px] overflow-auto divide-y divide-slate-50">
-                                    ${topRiskRows.length === 0 ? `<div class="p-5 text-xs text-slate-400 font-bold">Tiada murid berisiko berdasarkan data semasa.</div>` : topRiskRows.map(r => {
-                                        const risk = getStudentRiskAI(r);
-                                        return `<div class="p-4 space-y-1">
-                                            <div class="flex items-start justify-between gap-2">
-                                                <p class="text-xs font-black text-slate-800 leading-snug">${r.nama}</p>
-                                                <span class="shrink-0 px-2 py-1 rounded-full border text-[9px] font-black ${risk.badge}">${r.risiko}</span>
-                                            </div>
-                                            <p class="text-[10px] text-slate-400 font-bold">${r.kelas} • Purata ${r.purata}%</p>
-                                        </div>`;
-                                    }).join('')}
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            `;
+        function readSismarAIInterventions() {
+            try { return JSON.parse(localStorage.getItem(SISMAR_AI_STORAGE_KEY) || '[]'); }
+            catch (e) { console.warn('Rekod intervensi tidak dapat dibaca:', e); return []; }
         }
 
-        function buildLocalSismarAIResponse(mode, question, snapshot) {
-            const weakest = snapshot.subjectStats[0];
-            const best = snapshot.subjectStats[snapshot.subjectStats.length - 1];
-            const riskList = [...snapshot.risikoTinggi, ...snapshot.risikoSederhana].slice(0, 10);
-            const riskText = riskList.length ? riskList.map((m, i) => `${i + 1}. ${m.nama} (${m.kelas}) - ${m.risiko}, purata ${m.purata}%. ${m.cadangan}`).join('\n') : 'Tiada murid berisiko berdasarkan data semasa.';
+        function writeSismarAIInterventions(rows) {
+            localStorage.setItem(SISMAR_AI_STORAGE_KEY, JSON.stringify(rows || []));
+        }
 
+        function getSismarAISelectedStudent() {
+            const rows = getSismarAIStudentRows();
+            return rows.find(r => String(r.id) === String(sismarAISelectedStudentId)) || rows[0] || null;
+        }
+
+        function updateSismarAIFilter(name, value) {
+            if (name === 'tahun') sismarAISelectedYear = value;
+            if (name === 'assessment') sismarAISelectedAssessment = value;
+            if (name === 'kelas') { sismarAISelectedClass = value; sismarAISelectedStudentId = ''; }
+            if (name === 'subject') { sismarAISelectedSubject = value; sismarAISelectedStudentId = ''; }
+            renderPage();
+        }
+
+        function setSismarAIStudent(value) {
+            sismarAISelectedStudentId = value;
+            const student = getSismarAISelectedStudent();
+            const box = document.getElementById('sismar-ai-student-profile');
+            if (box && student) box.innerHTML = renderSismarAIStudentProfile(student);
+        }
+
+        function renderSismarAIStudentProfile(student) {
+            if (!student) return '<div class="text-sm text-slate-400">Tiada murid dengan data markah atau PBD untuk tapisan ini.</div>';
+            const badge = student.risk === 'Risiko Tinggi' ? 'bg-rose-100 text-rose-700' : student.risk === 'Risiko Sederhana' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700';
+            return `
+                <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
+                    <div class="md:col-span-2"><p class="text-[10px] font-black text-slate-400 uppercase">Nama Murid</p><p class="font-black text-slate-800">${escapeHtml(student.nama)}</p></div>
+                    <div><p class="text-[10px] font-black text-slate-400 uppercase">Markah</p><p class="text-xl font-black text-blue-700">${student.mark === null ? '-' : student.mark + '%'}</p></div>
+                    <div><p class="text-[10px] font-black text-slate-400 uppercase">PBD</p><p class="text-xl font-black text-violet-700">${escapeHtml(student.pbd)}</p></div>
+                    <div><p class="text-[10px] font-black text-slate-400 uppercase">Status</p><span class="inline-flex mt-1 px-2.5 py-1 rounded-full text-[10px] font-black ${badge}">${escapeHtml(student.risk)}</span></div>
+                </div>`;
+        }
+
+        function renderSismarAIPage() {
+            const snapshot = getSismarAISnapshot();
+            const selectedStudent = getSismarAISelectedStudent();
+            if (!sismarAISelectedStudentId && selectedStudent) sismarAISelectedStudentId = selectedStudent.id;
+            const savedCount = readSismarAIInterventions().length;
+            const classOptions = classes.map(v => `<option value="${escapeHtml(v)}" ${normalizeClassName(v) === normalizeClassName(sismarAISelectedClass) ? 'selected' : ''}>${escapeHtml(v)}</option>`).join('');
+            const studentOptions = snapshot.murid.map(r => `<option value="${r.id}" ${String(r.id) === String(sismarAISelectedStudentId) ? 'selected' : ''}>${escapeHtml(r.nama)} • ${r.mark === null ? '-' : r.mark + '%'} • ${escapeHtml(r.pbd)}</option>`).join('');
+            const riskRows = [...snapshot.risikoTinggi, ...snapshot.risikoSederhana].slice(0, 12);
+
+            return `
+                <div class="space-y-6 pb-10">
+                    <section class="bg-gradient-to-r from-indigo-700 via-blue-600 to-cyan-600 text-white p-6 md:p-8 rounded-3xl shadow-lg relative overflow-hidden">
+                        <div class="relative z-10 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-5">
+                            <div>
+                                <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/15 border border-white/20 text-[10px] font-black uppercase tracking-wider"><i data-lucide="brain-circuit" class="w-4 h-4"></i> SISMAR AI Smart Intervention</div>
+                                <h3 class="text-2xl md:text-3xl font-black mt-3">Analisis Tepat, Intervensi Berfokus</h3>
+                                <p class="text-sm text-blue-50 mt-2 max-w-3xl">Analisis subjek dan kelas, pemilihan murid berdasarkan markah serta PBD, pelan intervensi, soalan latihan, simpanan rekod, eksport dan cetakan.</p>
+                            </div>
+                            <div class="grid grid-cols-2 gap-2 text-[10px] font-black">
+                                <span class="px-3 py-2 rounded-xl bg-white/15 border border-white/20">● AI CONNECTED</span>
+                                <span class="px-3 py-2 rounded-xl bg-white/15 border border-white/20">● SUPABASE LIVE</span>
+                            </div>
+                        </div>
+                        <i data-lucide="sparkles" class="absolute -right-8 -bottom-8 w-44 h-44 opacity-10"></i>
+                    </section>
+
+                    <section class="bg-white rounded-3xl border border-blue-100 shadow-sm p-5">
+                        <div class="flex items-center justify-between gap-3 mb-4"><div><h3 class="font-black text-slate-800">Tapisan Analisis</h3><p class="text-xs text-slate-500">Gunakan nilai yang sama seperti rekod Supabase.</p></div><span class="text-[10px] font-black text-blue-700 bg-blue-50 px-3 py-1.5 rounded-full">${savedCount} INTERVENSI DISIMPAN</span></div>
+                        <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
+                            <select onchange="updateSismarAIFilter('tahun',this.value)" class="p-3 rounded-xl border border-slate-200 text-xs font-bold">${years.map(v => `<option ${v===sismarAISelectedYear?'selected':''}>${v}</option>`).join('')}</select>
+                            <select onchange="updateSismarAIFilter('assessment',this.value)" class="p-3 rounded-xl border border-slate-200 text-xs font-bold">${assessments.map(v => `<option ${v===sismarAISelectedAssessment?'selected':''}>${escapeHtml(v)}</option>`).join('')}</select>
+                            <select onchange="updateSismarAIFilter('kelas',this.value)" class="p-3 rounded-xl border border-slate-200 text-xs font-bold">${classOptions}</select>
+                            <select onchange="updateSismarAIFilter('subject',this.value)" class="p-3 rounded-xl border border-slate-200 text-xs font-bold">${baseSubjects.map(v => `<option ${v===sismarAISelectedSubject?'selected':''}>${escapeHtml(v)}</option>`).join('')}</select>
+                        </div>
+                    </section>
+
+                    <section class="grid grid-cols-2 lg:grid-cols-6 gap-3">
+                        ${[
+                            ['Purata', snapshot.purata + '%', 'text-blue-700 border-blue-100'],
+                            ['Tertinggi', snapshot.tertinggi + '%', 'text-indigo-700 border-indigo-100'],
+                            ['Terendah', snapshot.terendah + '%', 'text-slate-700 border-slate-200'],
+                            ['Risiko Tinggi', snapshot.risikoTinggi.length, 'text-rose-700 border-rose-100'],
+                            ['Risiko Sederhana', snapshot.risikoSederhana.length, 'text-amber-700 border-amber-100'],
+                            ['Rekod Murid', snapshot.jumlahMurid, 'text-emerald-700 border-emerald-100']
+                        ].map(x => `<div class="bg-white p-4 rounded-2xl border ${x[2]} shadow-sm"><p class="text-[9px] font-black text-slate-400 uppercase">${x[0]}</p><p class="text-2xl font-black ${x[2].split(' ')[0]}">${x[1]}</p></div>`).join('')}
+                    </section>
+
+                    <section class="grid grid-cols-1 xl:grid-cols-3 gap-6">
+                        <div class="xl:col-span-2 bg-white rounded-3xl border border-blue-100 shadow-sm overflow-hidden">
+                            <div class="p-5 border-b border-slate-100"><h3 class="font-black text-slate-800 flex items-center gap-2"><i data-lucide="bot" class="w-5 h-5 text-blue-600"></i> Pusat Analisis dan Intervensi AI</h3></div>
+                            <div class="p-5 space-y-4">
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                    <select id="sismar-ai-mode" onchange="sismarAISelectedMode=this.value" class="p-3 border border-slate-200 rounded-xl text-xs font-bold">
+                                        <option value="subjek" ${sismarAISelectedMode==='subjek'?'selected':''}>Analisis Subjek</option>
+                                        <option value="kelas" ${sismarAISelectedMode==='kelas'?'selected':''}>Analisis Kelas</option>
+                                        <option value="pbd" ${sismarAISelectedMode==='pbd'?'selected':''}>Analisis PBD</option>
+                                        <option value="intervensi" ${sismarAISelectedMode==='intervensi'?'selected':''}>Pelan Intervensi Murid</option>
+                                        <option value="soalan" ${sismarAISelectedMode==='soalan'?'selected':''}>Soalan Intervensi</option>
+                                    </select>
+                                    <select id="sismar-ai-student" onchange="setSismarAIStudent(this.value)" class="p-3 border border-slate-200 rounded-xl text-xs font-bold"><option value="">Pilih murid</option>${studentOptions}</select>
+                                </div>
+                                <div id="sismar-ai-student-profile" class="p-4 rounded-2xl bg-slate-50 border border-slate-100">${renderSismarAIStudentProfile(selectedStudent)}</div>
+                                <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                    <input id="sismar-ai-topic" value="${escapeHtml(sismarAISelectedTopic)}" oninput="sismarAISelectedTopic=this.value" class="md:col-span-2 p-3 border border-slate-200 rounded-xl text-xs font-semibold" placeholder="Topik atau kemahiran intervensi, contoh: Operasi tambah dalam lingkungan 100">
+                                    <select id="sismar-ai-question-count" onchange="sismarAIQuestionCount=Number(this.value)" class="p-3 border border-slate-200 rounded-xl text-xs font-bold">${[5,10,15,20].map(n => `<option value="${n}" ${n===sismarAIQuestionCount?'selected':''}>${n} soalan</option>`).join('')}</select>
+                                </div>
+                                <div class="flex flex-wrap gap-2">
+                                    <button id="sismar-ai-run-btn" onclick="runSismarAI()" class="px-5 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-black flex items-center gap-2"><i data-lucide="sparkles" class="w-4 h-4"></i> JANA ANALISIS PINTAR</button>
+                                    <button onclick="saveSismarAIIntervention()" class="px-4 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black flex items-center gap-2"><i data-lucide="save" class="w-4 h-4"></i> SIMPAN</button>
+                                    <button onclick="printSismarAIResult()" class="px-4 py-3 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-xs font-black flex items-center gap-2"><i data-lucide="printer" class="w-4 h-4"></i> CETAK</button>
+                                    <button onclick="exportSismarAIResult()" class="px-4 py-3 bg-violet-600 hover:bg-violet-700 text-white rounded-xl text-xs font-black flex items-center gap-2"><i data-lucide="download" class="w-4 h-4"></i> EXPORT</button>
+                                    <button onclick="copySismarAIResult()" class="px-4 py-3 border border-slate-200 rounded-xl text-xs font-black"><i data-lucide="copy" class="w-4 h-4 inline mr-1"></i> SALIN</button>
+                                </div>
+                                <div id="sismar-ai-output" class="min-h-[300px] whitespace-pre-wrap p-5 rounded-2xl bg-slate-50 border border-slate-100 text-sm text-slate-700 leading-relaxed">Pilih jenis analisis dan murid. Kemudian klik JANA ANALISIS PINTAR.</div>
+                            </div>
+                        </div>
+
+                        <div class="space-y-5">
+                            <div class="bg-white rounded-3xl border border-blue-100 shadow-sm p-5">
+                                <h3 class="font-black text-slate-800 mb-3">Agihan PBD</h3>
+                                <div class="grid grid-cols-3 gap-2">${Object.entries(snapshot.tpCounts).map(([tp,count]) => `<div class="p-3 rounded-xl bg-violet-50 text-center"><p class="text-xs font-black text-violet-700">${tp}</p><p class="text-xl font-black text-slate-800">${count}</p></div>`).join('')}</div>
+                            </div>
+                            <div class="bg-white rounded-3xl border border-rose-100 shadow-sm overflow-hidden">
+                                <div class="p-5 border-b border-slate-100"><h3 class="font-black text-slate-800">Murid Perlu Tumpuan</h3></div>
+                                <div class="max-h-[430px] overflow-y-auto divide-y divide-slate-100">${riskRows.length ? riskRows.map(r => `<button onclick="sismarAISelectedStudentId='${r.id}';renderPage()" class="w-full p-4 text-left hover:bg-slate-50"><div class="flex items-start justify-between gap-3"><div><p class="text-xs font-black text-slate-800">${escapeHtml(r.nama)}</p><p class="text-[10px] text-slate-500 mt-1">${escapeHtml(r.kelas)} • ${r.mark===null?'-':r.mark+'%'} • ${escapeHtml(r.pbd)}</p></div><span class="text-[9px] font-black px-2 py-1 rounded-full ${r.risk==='Risiko Tinggi'?'bg-rose-100 text-rose-700':'bg-amber-100 text-amber-700'}">${escapeHtml(r.risk)}</span></div></button>`).join('') : '<p class="p-5 text-sm text-slate-400">Tiada murid berisiko bagi tapisan ini.</p>'}</div>
+                            </div>
+                        </div>
+                    </section>
+
+                    ${renderSavedSismarAIInterventions()}
+                </div>`;
+        }
+
+        function buildLocalSismarAIResponse(mode, snapshot, student, topic) {
+            const riskNames = snapshot.risikoTinggi.slice(0, 10).map((r,i) => `${i+1}. ${r.nama} (${r.mark===null?'-':r.mark+'%'}, ${r.pbd})`).join('\n') || 'Tiada murid risiko tinggi.';
+            if (mode === 'kelas') return `ANALISIS KELAS\n\nKelas: ${snapshot.kelas}\nPentaksiran: ${snapshot.assessment}\nPurata: ${snapshot.purata}%\nMurid dianalisis: ${snapshot.jumlahMurid}\nRisiko tinggi: ${snapshot.risikoTinggi.length}\nRisiko sederhana: ${snapshot.risikoSederhana.length}\n\nMurid keutamaan:\n${riskNames}\n\nTindakan: selaraskan intervensi guru subjek, pantau dua minggu dan jalankan pentaksiran semula.`;
+            if (mode === 'pbd') return `ANALISIS PBD\n\nKelas: ${snapshot.kelas}\nSubjek: ${snapshot.subject}\nTP1: ${snapshot.tpCounts.TP1}\nTP2: ${snapshot.tpCounts.TP2}\nTP3: ${snapshot.tpCounts.TP3}\nTP4: ${snapshot.tpCounts.TP4}\nTP5: ${snapshot.tpCounts.TP5}\nTP6: ${snapshot.tpCounts.TP6}\n\nKeutamaan diberikan kepada murid TP1 dan TP2 melalui bimbingan individu, bahan konkrit, latihan berperingkat dan penilaian semula.`;
+            if (!student) return 'Sila pilih murid yang mempunyai data markah atau PBD.';
+            const level = student.mark !== null && student.mark < 40 || ['TP1','TP2'].includes(student.pbd) ? 'asas dan berpandu' : student.mark !== null && student.mark < 65 || student.pbd === 'TP3' ? 'pengukuhan sederhana' : 'aplikasi dan pengayaan';
+            if (mode === 'soalan') {
+                const t = topic || 'kemahiran yang dipilih oleh guru';
+                const questions = Array.from({length:sismarAIQuestionCount}, (_,i) => `${i+1}. Soalan ${level} berkaitan ${t}.`).join('\n');
+                return `SET SOALAN INTERVENSI\n\nNama: ${student.nama}\nKelas: ${student.kelas}\nSubjek: ${snapshot.subject}\nMarkah: ${student.mark===null?'-':student.mark+'%'}\nPBD: ${student.pbd}\nTopik: ${t}\nTahap: ${level}\n\nARAHAN\nJawab semua soalan. Guru boleh menyunting soalan mengikut kandungan DSKP.\n\n${questions}\n\nSKEMA CADANGAN\nSediakan jawapan berdasarkan topik sebenar yang dipilih guru. Semak kesesuaian fakta sebelum digunakan.`;
+            }
             if (mode === 'intervensi') {
-                return `PELAN INTERVENSI AI\n\nFokus utama: ${weakest ? weakest.subject : 'Belum cukup data'}\nMurid sasaran:\n${riskText}\n\nCadangan tindakan:\n1. Jalankan diagnostik topik bagi subjek lemah.\n2. Bentuk kumpulan kecil mengikut tahap risiko.\n3. Beri latihan berfokus selama dua minggu.\n4. Semak semula markah dan TP selepas intervensi.\n5. Maklumkan perkembangan kepada guru kelas dan ibu bapa.`;
+                return `PELAN INTERVENSI INDIVIDU\n\nNama Murid: ${student.nama}\nKelas: ${student.kelas}\nSubjek: ${snapshot.subject}\nPentaksiran: ${snapshot.assessment}\nMarkah Awal: ${student.mark===null?'-':student.mark+'%'}\nPBD Awal: ${student.pbd}\nKategori: ${student.risk}\nTopik/Kemahiran: ${topic || 'Perlu ditetapkan oleh guru'}\n\nDIAGNOSIS\nMurid memerlukan intervensi ${level} berdasarkan markah pentaksiran dan PBD yang direkodkan.\n\nOBJEKTIF\nMurid menunjukkan peningkatan sekurang-kurangnya 20 mata peratus atau meningkat satu tahap penguasaan selepas intervensi.\n\nAKTIVITI\n1. Bimbingan kumpulan kecil selama 20 minit.\n2. Penerangan semula menggunakan contoh mudah dan bahan visual.\n3. Latihan berperingkat daripada aras asas kepada aplikasi.\n4. Maklum balas segera dan pembetulan kesalahan.\n5. Ujian pasca selepas dua minggu.\n\nTEMPOH\nDua minggu, tiga sesi seminggu.\n\nINDIKATOR KEJAYAAN\nMencapai sekurang-kurangnya 70% atau meningkat satu TP.\n\nTINDAKAN SUSULAN\nRekod markah pasca, semak perkembangan dan sambung intervensi jika sasaran belum dicapai.`;
             }
-
-            if (mode === 'ibu_bapa') {
-                const first = riskList[0];
-                if (!first) return 'Laporan ibu bapa belum dapat dijana kerana tiada murid berisiko berdasarkan data semasa.';
-                return `LAPORAN RINGKAS IBU BAPA\n\nPrestasi ${first.nama} berada pada tahap ${first.risiko}. Purata semasa ialah ${first.purata}%.\n\n${first.sebab}\n\nCadangan kepada ibu bapa:\n1. Bantu anak membuat ulang kaji sekurang-kurangnya 20 minit sehari.\n2. Pantau latihan yang diberikan oleh guru.\n3. Beri galakan positif dan hadirkan anak ke sesi intervensi.\n\nTerima kasih atas kerjasama tuan/puan.`;
-            }
-
-            if (mode === 'subjek') {
-                return `ANALISIS SUBJEK AI\n\nSubjek terbaik: ${best ? best.subject + ' dengan purata ' + best.average + '%' : '-'}\nSubjek memerlukan perhatian: ${weakest ? weakest.subject + ' dengan purata ' + weakest.average + '%' : '-'}\n\nCadangan:\n1. Kenal pasti topik yang paling banyak menyebabkan markah rendah.\n2. Laksanakan latihan pengukuhan untuk murid bawah 60%.\n3. Gunakan aktiviti pemulihan untuk murid TP1 dan TP2.\n4. Sediakan soalan pengayaan untuk murid cemerlang.`;
-            }
-
-            if (mode === 'kelas') {
-                return `ANALISIS KELAS AI\n\nTahun pentaksiran: ${snapshot.tahun}\nPentaksiran: ${snapshot.assessment}\nPurata keseluruhan: ${snapshot.purataSekolah}%\n\nRisiko tinggi: ${snapshot.risikoTinggi.length} murid\nRisiko sederhana: ${snapshot.risikoSederhana.length} murid\nRisiko rendah: ${snapshot.risikoRendah.length} murid\n\nSenarai tumpuan:\n${riskText}`;
-            }
-
-            if (mode === 'chat') {
-                return `JAWAPAN AI\n\nSoalan: ${question || 'Murid mana perlu intervensi segera?'}\n\n${riskText}\n\nCadangan utama: fokus kepada murid risiko tinggi dahulu, kemudian jalankan pemulihan berfokus untuk subjek paling lemah iaitu ${weakest ? weakest.subject : 'belum dikenal pasti'}.`;
-            }
-
-            return `RINGKASAN AI GURU BESAR\n\nJumlah murid: ${snapshot.jumlahMurid}\nMurid dengan data markah: ${snapshot.jumlahDataMarkah}\nPurata keseluruhan: ${snapshot.purataSekolah}%\n\nRisiko tinggi: ${snapshot.risikoTinggi.length} murid\nRisiko sederhana: ${snapshot.risikoSederhana.length} murid\nRisiko rendah: ${snapshot.risikoRendah.length} murid\n\nSubjek terbaik: ${best ? best.subject + ' (' + best.average + '%)' : '-'}\nSubjek lemah: ${weakest ? weakest.subject + ' (' + weakest.average + '%)' : '-'}\n\nCadangan pentadbiran:\n1. Pantau murid risiko tinggi secara mingguan.\n2. Minta guru subjek menyediakan intervensi berfokus.\n3. Semak perkembangan selepas dua minggu.\n4. Gunakan laporan ini untuk mesyuarat kurikulum dan perbincangan bersama guru kelas.`;
+            return `ANALISIS SUBJEK\n\nSubjek: ${snapshot.subject}\nKelas: ${snapshot.kelas}\nPentaksiran: ${snapshot.assessment}\nPurata: ${snapshot.purata}%\nTertinggi: ${snapshot.tertinggi}%\nTerendah: ${snapshot.terendah}%\nRisiko tinggi: ${snapshot.risikoTinggi.length}\nRisiko sederhana: ${snapshot.risikoSederhana.length}\n\nMurid keutamaan:\n${riskNames}\n\nCadangan: jalankan intervensi mengikut tahap murid, sediakan latihan berperingkat dan buat pentaksiran semula selepas dua minggu.`;
         }
 
         async function runSismarAI() {
             const output = document.getElementById('sismar-ai-output');
             const btn = document.getElementById('sismar-ai-run-btn');
-            const modeEl = document.getElementById('sismar-ai-mode');
-            const questionEl = document.getElementById('sismar-ai-question');
-            const mode = modeEl ? modeEl.value : sismarAISelectedMode;
-            const question = questionEl ? questionEl.value.trim() : '';
+            const mode = document.getElementById('sismar-ai-mode')?.value || sismarAISelectedMode;
+            const topic = document.getElementById('sismar-ai-topic')?.value.trim() || sismarAISelectedTopic;
             const snapshot = getSismarAISnapshot();
-
-            if (output) output.innerText = 'SISMAR AI sedang menjana analisis...';
-            if (btn) btn.disabled = true;
-
+            const student = getSismarAISelectedStudent();
+            sismarAISelectedMode = mode;
+            sismarAISelectedTopic = topic;
+            if (output) output.textContent = 'SISMAR AI sedang membaca markah, PBD dan menjana analisis...';
+            if (btn) { btn.disabled = true; btn.classList.add('opacity-60'); }
+            let aiText = '';
             try {
-                if (supabaseEnabled && supabaseClient) {
-                    const { data, error } = await supabaseClient.functions.invoke('sismar-ai', {
-                        body: {
-                            jenis: mode,
-                            soalan: question,
-                            data: snapshot
-                        }
+                if (supabaseEnabled && supabaseClient && ['subjek','kelas','pbd'].includes(mode)) {
+                    const { data, error } = await supabaseClient.functions.invoke(SISMAR_AI_FUNCTION_NAME, {
+                        body: { kelas: snapshot.kelas, tahun: snapshot.tahun, subject: snapshot.subject, assessment: snapshot.assessment }
                     });
-
-                    if (!error && data && (data.result || data.text || data.output)) {
-                        sismarAIResult = data.result || data.text || data.output;
-                    } else {
-                        sismarAIResult = buildLocalSismarAIResponse(mode, question, snapshot);
-                    }
-                } else {
-                    sismarAIResult = buildLocalSismarAIResponse(mode, question, snapshot);
+                    if (!error && data?.success && data?.analisis) aiText = data.analisis;
                 }
-            } catch (err) {
-                console.warn('Gemini/Supabase Edge Function belum tersedia. Guna analisis tempatan.', err);
-                sismarAIResult = buildLocalSismarAIResponse(mode, question, snapshot);
-            }
-
-            if (output) output.innerText = sismarAIResult;
-            if (btn) btn.disabled = false;
+            } catch (err) { console.warn('Edge Function AI tidak dapat digunakan. Analisis tempatan digunakan.', err); }
+            const localText = buildLocalSismarAIResponse(mode, snapshot, student, topic);
+            sismarAIResult = aiText ? `${aiText}\n\n--- DATA DAN TINDAKAN SISMAR ---\n${localText}` : localText;
+            if (output) output.textContent = sismarAIResult;
+            if (btn) { btn.disabled = false; btn.classList.remove('opacity-60'); }
             showToast('Analisis SISMAR AI berjaya dijana.', 'success');
+        }
+
+        function saveSismarAIIntervention() {
+            const student = getSismarAISelectedStudent();
+            if (!sismarAIResult) { showToast('Jana analisis atau intervensi dahulu.', 'warning'); return; }
+            const rows = readSismarAIInterventions();
+            rows.unshift({
+                id: Date.now(), student_id: student?.id || '', student_name: student?.nama || 'Analisis Kelas',
+                kelas: sismarAISelectedClass, tahun: sismarAISelectedYear, assessment: sismarAISelectedAssessment,
+                subject: sismarAISelectedSubject, mark: student?.mark ?? '', pbd: student?.pbd || '',
+                mode: sismarAISelectedMode, topic: sismarAISelectedTopic, result: sismarAIResult,
+                teacher: currentUser?.name || '', created_at: new Date().toISOString()
+            });
+            writeSismarAIInterventions(rows);
+            showToast('Intervensi berjaya disimpan tanpa mengubah markah.', 'success');
+            renderPage();
+        }
+
+        function deleteSismarAIIntervention(id) {
+            const rows = readSismarAIInterventions().filter(r => String(r.id) !== String(id));
+            writeSismarAIInterventions(rows);
+            showToast('Rekod intervensi dipadam. Markah dan PBD tidak terjejas.', 'success');
+            renderPage();
+        }
+
+        function renderSavedSismarAIInterventions() {
+            const rows = readSismarAIInterventions().slice(0, 20);
+            return `<section class="bg-white rounded-3xl border border-emerald-100 shadow-sm overflow-hidden"><div class="p-5 border-b border-slate-100 flex items-center justify-between"><div><h3 class="font-black text-slate-800">Rekod Intervensi Disimpan</h3><p class="text-xs text-slate-500">Rekod berasingan. Tidak mengubah jadual marks atau pbd.</p></div></div><div class="overflow-x-auto"><table class="w-full text-xs"><thead class="bg-slate-50"><tr><th class="p-3 text-left">Murid</th><th class="p-3 text-left">Subjek</th><th class="p-3 text-left">Jenis</th><th class="p-3 text-left">Tarikh</th><th class="p-3 text-center">Tindakan</th></tr></thead><tbody class="divide-y divide-slate-100">${rows.length ? rows.map(r => `<tr><td class="p-3 font-bold">${escapeHtml(r.student_name)}<div class="text-[10px] text-slate-400">${escapeHtml(r.kelas)}</div></td><td class="p-3">${escapeHtml(r.subject)}</td><td class="p-3 uppercase font-bold text-blue-700">${escapeHtml(r.mode)}</td><td class="p-3">${new Date(r.created_at).toLocaleString('ms-MY')}</td><td class="p-3 text-center"><button onclick="loadSismarAIIntervention(${r.id})" class="px-3 py-1.5 bg-blue-50 text-blue-700 rounded-lg font-black mr-1">BUKA</button><button onclick="deleteSismarAIIntervention(${r.id})" class="px-3 py-1.5 bg-rose-50 text-rose-700 rounded-lg font-black">PADAM</button></td></tr>`).join('') : '<tr><td colspan="5" class="p-6 text-center text-slate-400">Belum ada intervensi disimpan.</td></tr>'}</tbody></table></div></section>`;
+        }
+
+        function loadSismarAIIntervention(id) {
+            const row = readSismarAIInterventions().find(r => String(r.id) === String(id));
+            if (!row) return;
+            sismarAIResult = row.result || '';
+            const output = document.getElementById('sismar-ai-output');
+            if (output) { output.textContent = sismarAIResult; output.scrollIntoView({behavior:'smooth', block:'center'}); }
         }
 
         function copySismarAIResult() {
             const text = sismarAIResult || document.getElementById('sismar-ai-output')?.innerText || '';
-            if (!text) return;
+            if (!text) { showToast('Tiada analisis untuk disalin.', 'warning'); return; }
             navigator.clipboard.writeText(text).then(() => showToast('Analisis AI telah disalin.', 'success'));
+        }
+
+        function exportSismarAIResult() {
+            const text = sismarAIResult || document.getElementById('sismar-ai-output')?.innerText || '';
+            if (!text) { showToast('Tiada analisis untuk dieksport.', 'warning'); return; }
+            const student = getSismarAISelectedStudent();
+            const filename = `SISMAR_AI_${sismarAISelectedMode}_${student?.nama || sismarAISelectedClass}_${sismarAISelectedSubject}.txt`.replace(/[^a-zA-Z0-9_.-]+/g,'_');
+            const blob = new Blob(['\ufeff' + text], {type:'text/plain;charset=utf-8'});
+            const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href=url; a.download=filename; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+            showToast('Analisis berjaya dieksport.', 'success');
+        }
+
+        function printSismarAIResult() {
+            const text = sismarAIResult || document.getElementById('sismar-ai-output')?.innerText || '';
+            if (!text) { showToast('Tiada analisis untuk dicetak.', 'warning'); return; }
+            const student = getSismarAISelectedStudent();
+            const w = window.open('', '_blank');
+            if (!w) { showToast('Benarkan pop-up untuk mencetak.', 'warning'); return; }
+            w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>SISMAR AI</title><style>body{font-family:Arial;padding:28px;color:#111}h1{text-align:center;font-size:20px}p{font-size:12px}.meta{border:1px solid #000;padding:10px;margin:12px 0}.result{white-space:pre-wrap;line-height:1.6;font-size:13px}@page{size:A4;margin:15mm}</style></head><body><h1>SISMAR AI SMART INTERVENTION</h1><div class="meta"><b>Nama:</b> ${escapeHtml(student?.nama || 'Analisis Kelas')}<br><b>Kelas:</b> ${escapeHtml(sismarAISelectedClass)}<br><b>Subjek:</b> ${escapeHtml(sismarAISelectedSubject)}<br><b>Pentaksiran:</b> ${escapeHtml(sismarAISelectedAssessment)}<br><b>Guru:</b> ${escapeHtml(currentUser?.name || '')}</div><div class="result">${escapeHtml(text)}</div><p style="margin-top:50px">Tandatangan Guru: _______________________ &nbsp;&nbsp;&nbsp; Pengesahan Pentadbir: _______________________</p></body></html>`);
+            w.document.close(); w.focus(); w.print();
         }
 
         // --- MODUL BORANG DISKUSI AKAUNTABALITI (DIASINGKAN DALAM IFRAME) ---
