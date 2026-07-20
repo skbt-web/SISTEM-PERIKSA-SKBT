@@ -261,6 +261,20 @@
             }
         }
 
+
+        @media print {
+            body.teacher-analysis-print-mode .no-print,
+            body.teacher-analysis-print-mode aside,
+            body.teacher-analysis-print-mode header,
+            body.teacher-analysis-print-mode #sidebar-overlay,
+            body.teacher-analysis-print-mode #toast-container { display:none !important; }
+            body.teacher-analysis-print-mode #app-container,
+            body.teacher-analysis-print-mode main,
+            body.teacher-analysis-print-mode #page-content { display:block !important; height:auto !important; overflow:visible !important; padding:0 !important; margin:0 !important; background:white !important; }
+            body.teacher-analysis-print-mode #teacher-analysis-print-area { display:block !important; }
+            body.teacher-analysis-print-mode canvas { max-height:260px !important; }
+            @page { size:A4 landscape; margin:8mm; }
+        }
     </style>
 </head>
 <body class="bg-slate-100 min-h-screen">
@@ -1374,6 +1388,9 @@ if (type === 'guru_kelas') {
                 html += `
                 <button onclick="navigate('pengisian_markah')" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all" data-page="pengisian_markah">
                     <i data-lucide="book-open"></i><span>Pengisian Markah</span>
+                </button>
+                <button onclick="navigate('analisis_guru_subjek')" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all" data-page="analisis_guru_subjek">
+                    <i data-lucide="chart-no-axes-combined"></i><span>ANALISIS</span>
                 </button>`;
             }
 
@@ -3892,6 +3909,324 @@ if (type === 'guru_kelas') {
                 </div>`;
         }
 
+
+        // --- MODUL ANALISIS GURU SUBJEK (READ-ONLY) ---
+        // Modul ini hanya membaca data students, studentMarks dan studentPBD.
+        // Tiada arahan insert, update atau delete terhadap jadual marks / pbd.
+        let teacherAnalysisCharts = {};
+        const TEACHER_INTERVENTION_STATUS_KEY = 'sismar_teacher_intervention_status_v1';
+
+        function destroyTeacherAnalysisCharts() {
+            Object.values(teacherAnalysisCharts || {}).forEach(chart => {
+                try { if (chart && typeof chart.destroy === 'function') chart.destroy(); } catch (e) {}
+            });
+            teacherAnalysisCharts = {};
+        }
+
+        function getAssessmentShortName(name) {
+            const value = String(name || '').toUpperCase();
+            if (value.includes('SUMATIF 1')) return 'PS1';
+            if (value.includes('SUMATIF 2')) return 'PS2';
+            if (value.includes('UASA') || value.includes('AKHIR SESI')) return 'UASA';
+            return String(name || '-');
+        }
+
+        function getTeacherAnalysisFilters() {
+            return {
+                year: document.getElementById('ta-year')?.value || selectedYear,
+                kelas: document.getElementById('ta-class')?.value || selectedClass,
+                assessment: document.getElementById('ta-assessment')?.value || selectedAssessment,
+                subject: document.getElementById('ta-subject')?.value || selectedSubject
+            };
+        }
+
+        function updateTeacherAnalysisFilter(field, value) {
+            if (field === 'year') selectedYear = value;
+            if (field === 'kelas') selectedClass = canonicalClassName(value);
+            if (field === 'assessment') selectedAssessment = value;
+            if (field === 'subject') selectedSubject = value;
+            renderTeacherSubjectAnalysisPage();
+        }
+
+        function getAnalysisMarkValue(studentId, year, assessment, subject) {
+            const key = `${studentId}_${year}_${assessment}_${subject}`;
+            if (Object.prototype.hasOwnProperty.call(studentMarks, key)) return studentMarks[key];
+            const row = (markStatusRows || []).find(r =>
+                String(r.student_id) === String(studentId) &&
+                String(r.tahun) === String(year) &&
+                String(r.assessment) === String(assessment) &&
+                String(r.subject) === String(subject)
+            );
+            return row ? row.value : '';
+        }
+
+        function getAnalysisPBDValue(studentId, year, assessment, subject) {
+            const key = `${studentId}_${year}_${assessment}_${subject}`;
+            if (Object.prototype.hasOwnProperty.call(studentPBD, key)) return studentPBD[key];
+            const row = (pbdStatusRows || []).find(r =>
+                String(r.student_id) === String(studentId) &&
+                String(r.tahun) === String(year) &&
+                String(r.assessment) === String(assessment) &&
+                String(r.subject) === String(subject)
+            );
+            return row ? row.value : '';
+        }
+
+        function normalizeAnalysisMark(raw) {
+            const str = String(raw ?? '').trim().toUpperCase();
+            const absent = ['TH', 'TIDAK HADIR', 'ABSENT', 'T'].includes(str);
+            if (absent) return { raw, absent: true, hasMark: false, value: null };
+            if (str === '') return { raw, absent: false, hasMark: false, value: null };
+            const num = Number(str);
+            return Number.isFinite(num) && num >= 0 && num <= 100
+                ? { raw, absent: false, hasMark: true, value: num }
+                : { raw, absent: false, hasMark: false, value: null };
+        }
+
+        function medianOf(values) {
+            if (!values.length) return 0;
+            const sorted = [...values].sort((a,b) => a-b);
+            const mid = Math.floor(sorted.length / 2);
+            return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+        }
+
+        function analysisGrade(score) {
+            return calculateUASAGrade(score).grade;
+        }
+
+        function getPreviousAssessmentName(current) {
+            const idx = assessments.indexOf(current);
+            return idx > 0 ? assessments[idx - 1] : '';
+        }
+
+        function buildTeacherAnalysisDataset(filters) {
+            const roster = getStudentsByExactClass(filters.kelas);
+            const prevAssessment = getPreviousAssessmentName(filters.assessment);
+            const rows = roster.map(student => {
+                const markObj = normalizeAnalysisMark(getAnalysisMarkValue(student.id, filters.year, filters.assessment, filters.subject));
+                const pbd = String(getAnalysisPBDValue(student.id, filters.year, filters.assessment, filters.subject) || '').toUpperCase();
+                const prevObj = prevAssessment
+                    ? normalizeAnalysisMark(getAnalysisMarkValue(student.id, filters.year, prevAssessment, filters.subject))
+                    : { hasMark: false, value: null };
+                const grade = markObj.hasMark ? analysisGrade(markObj.value) : '-';
+                const pass = markObj.hasMark && markObj.value >= 35;
+                const fail = markObj.hasMark && markObj.value < 35;
+                const almostPass = markObj.hasMark && markObj.value >= 30 && markObj.value < 35;
+                const declining = markObj.hasMark && prevObj.hasMark && markObj.value < prevObj.value;
+                const lowTP = ['TP1','TP2'].includes(pbd);
+                const noMark = !markObj.hasMark && !markObj.absent;
+                const noPBD = !pbd;
+                let weakness = '-';
+                let intervention = '-';
+                if (noMark) { weakness = 'Markah belum dimasukkan'; intervention = 'Semak kehadiran dan lengkapkan pentaksiran.'; }
+                else if (markObj.absent) { weakness = 'Tidak hadir pentaksiran'; intervention = 'Jadualkan pentaksiran gantian.'; }
+                else if (fail) { weakness = 'Belum mencapai tahap minimum'; intervention = 'Bimbingan berfokus, latihan asas dan pemantauan mingguan.'; }
+                else if (almostPass) { weakness = 'Hampir mencapai tahap minimum'; intervention = 'Latihan pengukuhan topik kritikal dan bimbingan kumpulan kecil.'; }
+                else if (declining) { weakness = `Markah menurun ${Math.abs(markObj.value - prevObj.value).toFixed(0)} mata`; intervention = 'Analisis item, pemulihan topik dan semakan kemajuan.'; }
+                else if (lowTP) { weakness = `${pbd} memerlukan pengukuhan`; intervention = 'Aktiviti berperingkat, bahan konkrit dan evidens PBD tambahan.'; }
+                else if (noPBD) { weakness = 'PBD belum direkod'; intervention = 'Lengkapkan evidens dan tahap penguasaan PBD.'; }
+                return { student, markObj, pbd, prevObj, grade, pass, fail, almostPass, declining, lowTP, noMark, noPBD, weakness, intervention };
+            });
+
+            const numeric = rows.filter(r => r.markObj.hasMark).map(r => r.markObj.value);
+            const gradeCounts = { A:0, B:0, C:0, D:0, E:0, F:0 };
+            const tpCounts = { TP1:0, TP2:0, TP3:0, TP4:0, TP5:0, TP6:0 };
+            rows.forEach(r => {
+                if (gradeCounts[r.grade] !== undefined) gradeCounts[r.grade]++;
+                if (tpCounts[r.pbd] !== undefined) tpCounts[r.pbd]++;
+            });
+            const passCount = rows.filter(r => r.pass).length;
+            const failCount = rows.filter(r => r.fail).length;
+            const attended = numeric.length;
+            const absent = rows.filter(r => r.markObj.absent).length;
+            const average = numeric.length ? numeric.reduce((a,b)=>a+b,0)/numeric.length : 0;
+            return {
+                rows, numeric, gradeCounts, tpCounts,
+                stats: {
+                    total: rows.length,
+                    attended,
+                    absent,
+                    passCount,
+                    failCount,
+                    passPct: attended ? passCount/attended*100 : 0,
+                    failPct: attended ? failCount/attended*100 : 0,
+                    highest: numeric.length ? Math.max(...numeric) : 0,
+                    lowest: numeric.length ? Math.min(...numeric) : 0,
+                    average,
+                    median: medianOf(numeric)
+                }
+            };
+        }
+
+        function teacherAnalysisStatCard(label, value, icon, tone='blue') {
+            const tones = {
+                blue:'bg-blue-50 text-blue-700 border-blue-100', emerald:'bg-emerald-50 text-emerald-700 border-emerald-100',
+                rose:'bg-rose-50 text-rose-700 border-rose-100', amber:'bg-amber-50 text-amber-700 border-amber-100',
+                purple:'bg-purple-50 text-purple-700 border-purple-100', cyan:'bg-cyan-50 text-cyan-700 border-cyan-100'
+            };
+            return `<div class="bg-white border ${tones[tone]} rounded-2xl p-4 shadow-sm"><div class="flex items-center justify-between gap-3"><div><p class="text-[10px] uppercase font-extrabold opacity-70">${escapeHtml(label)}</p><p class="text-xl font-black mt-1">${escapeHtml(value)}</p></div><i data-lucide="${icon}" class="w-6 h-6 opacity-70"></i></div></div>`;
+        }
+
+        function getInterventionStatusMap() {
+            try { return JSON.parse(localStorage.getItem(TEACHER_INTERVENTION_STATUS_KEY) || '{}'); }
+            catch (e) { return {}; }
+        }
+
+        function saveTeacherInterventionStatus(key, value) {
+            const map = getInterventionStatusMap();
+            map[key] = value;
+            localStorage.setItem(TEACHER_INTERVENTION_STATUS_KEY, JSON.stringify(map));
+            showToast('Status intervensi dikemas kini. Markah dan PBD tidak diubah.', 'success');
+        }
+
+        function getTeacherInterventionRows(dataset) {
+            const seen = new Set();
+            const out = [];
+            dataset.rows.forEach(r => {
+                const categories = [];
+                if (r.fail) categories.push('Murid Gagal');
+                if (r.almostPass) categories.push('Hampir Lulus');
+                if (r.declining) categories.push('Markah Menurun');
+                if (r.lowTP) categories.push('TP1 / TP2');
+                if (r.noMark) categories.push('Belum Ada Markah');
+                if (r.noPBD) categories.push('Belum Ada PBD');
+                if (!categories.length) return;
+                const key = String(r.student.id);
+                if (seen.has(key)) return;
+                seen.add(key);
+                out.push({ ...r, categories });
+            });
+            return out;
+        }
+
+        function renderTeacherSubjectAnalysisPage() {
+            destroyTeacherAnalysisCharts();
+            const content = document.getElementById('page-content');
+            if (!content) return;
+            const filters = { year:selectedYear, kelas:selectedClass, assessment:selectedAssessment, subject:selectedSubject };
+            const dataset = buildTeacherAnalysisDataset(filters);
+            const s = dataset.stats;
+            const interventionRows = getTeacherInterventionRows(dataset);
+            const statusMap = getInterventionStatusMap();
+            const classYear = parseInt(String(filters.kelas).charAt(0)) || 1;
+            const availableSubjects = baseSubjects.filter(sub => classYear >= 4 || !['SEJARAH','REKA BENTUK TEKNOLOGI'].includes(sub));
+
+            const interventionHtml = interventionRows.length ? interventionRows.map((r, i) => {
+                const statusKey = `${filters.year}|${filters.kelas}|${filters.assessment}|${filters.subject}|${r.student.id}`;
+                const status = statusMap[statusKey] || 'Belum Bermula';
+                return `<tr class="border-b border-slate-100 align-top">
+                    <td class="p-3 text-center text-xs">${i+1}</td>
+                    <td class="p-3 text-xs font-bold text-slate-800 min-w-[220px]">${escapeHtml(r.student.nama)}</td>
+                    <td class="p-3 text-center text-xs font-bold">${r.markObj.hasMark ? r.markObj.value : (r.markObj.absent ? 'TH' : '-')}</td>
+                    <td class="p-3 text-center text-xs">${escapeHtml(r.grade)}</td>
+                    <td class="p-3 text-center text-xs">${escapeHtml(r.pbd || '-')}</td>
+                    <td class="p-3 text-xs"><div class="flex flex-wrap gap-1">${r.categories.map(c=>`<span class="px-2 py-1 rounded-full bg-rose-50 text-rose-700 font-bold text-[9px]">${escapeHtml(c)}</span>`).join('')}</div><p class="mt-2 text-slate-600">${escapeHtml(r.weakness)}</p></td>
+                    <td class="p-3 text-xs text-slate-600 min-w-[260px]">${escapeHtml(r.intervention)}</td>
+                    <td class="p-3 min-w-[180px]"><select onchange="saveTeacherInterventionStatus('${escapeHtml(statusKey)}',this.value)" class="w-full p-2 border border-slate-200 rounded-lg text-xs font-bold bg-white"><option ${status==='Belum Bermula'?'selected':''}>Belum Bermula</option><option ${status==='Sedang Dilaksanakan'?'selected':''}>Sedang Dilaksanakan</option><option ${status==='Selesai'?'selected':''}>Selesai</option></select></td>
+                </tr>`;
+            }).join('') : `<tr><td colspan="8" class="p-8 text-center text-sm text-slate-500">Tiada murid intervensi dikenal pasti untuk pilihan semasa.</td></tr>`;
+
+            content.innerHTML = `<div id="teacher-analysis-print-area" class="space-y-6">
+                <div class="no-print bg-gradient-to-r from-blue-700 via-indigo-700 to-purple-700 text-white p-6 rounded-3xl shadow-md">
+                    <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4"><div><p class="text-[10px] uppercase font-bold tracking-[0.2em] text-blue-200">Dashboard Guru Subjek</p><h2 class="text-2xl font-black mt-1">ANALISIS PENCAPAIAN & INTERVENSI</h2><p class="text-xs text-blue-100 mt-2">Analisis ini bersifat baca sahaja dan tidak mengubah markah atau PBD.</p></div><div class="flex flex-wrap gap-2"><button onclick="refreshTeacherAnalysisData()" class="px-4 py-2 bg-white/15 hover:bg-white/25 rounded-xl text-xs font-bold border border-white/20"><i data-lucide="refresh-cw" class="w-4 h-4 inline mr-1"></i>Segar Data</button><button onclick="exportTeacherAnalysisCSV()" class="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 rounded-xl text-xs font-bold"><i data-lucide="file-spreadsheet" class="w-4 h-4 inline mr-1"></i>CSV</button><button onclick="printTeacherAnalysis()" class="px-4 py-2 bg-white text-indigo-700 rounded-xl text-xs font-bold"><i data-lucide="printer" class="w-4 h-4 inline mr-1"></i>Cetak</button></div></div>
+                </div>
+
+                <div class="no-print bg-white border border-slate-200 rounded-2xl p-5 shadow-sm grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+                    <label class="text-xs font-bold text-slate-600">Sesi Akademik<select id="ta-year" onchange="updateTeacherAnalysisFilter('year',this.value)" class="mt-2 w-full p-3 border rounded-xl bg-white">${years.map(v=>`<option value="${v}" ${v===filters.year?'selected':''}>${v}</option>`).join('')}</select></label>
+                    <label class="text-xs font-bold text-slate-600">Nama Kelas<select id="ta-class" onchange="updateTeacherAnalysisFilter('kelas',this.value)" class="mt-2 w-full p-3 border rounded-xl bg-white">${classes.map(v=>`<option value="${v}" ${normalizeClassName(v)===normalizeClassName(filters.kelas)?'selected':''}>${v}</option>`).join('')}</select></label>
+                    <label class="text-xs font-bold text-slate-600">Pentaksiran<select id="ta-assessment" onchange="updateTeacherAnalysisFilter('assessment',this.value)" class="mt-2 w-full p-3 border rounded-xl bg-white">${assessments.map(v=>`<option value="${v}" ${v===filters.assessment?'selected':''}>${getAssessmentShortName(v)}</option>`).join('')}</select></label>
+                    <label class="text-xs font-bold text-slate-600">Mata Pelajaran<select id="ta-subject" onchange="updateTeacherAnalysisFilter('subject',this.value)" class="mt-2 w-full p-3 border rounded-xl bg-white">${availableSubjects.map(v=>`<option value="${v}" ${v===filters.subject?'selected':''}>${v}</option>`).join('')}</select></label>
+                </div>
+
+                <div class="bg-white border border-slate-200 rounded-2xl p-4"><div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
+                    ${teacherAnalysisStatCard('Jumlah Murid',s.total,'users','blue')}
+                    ${teacherAnalysisStatCard('Jumlah Hadir',s.attended,'user-check','emerald')}
+                    ${teacherAnalysisStatCard('Tidak Hadir',s.absent,'user-x','rose')}
+                    ${teacherAnalysisStatCard('Bilangan Lulus',s.passCount,'badge-check','emerald')}
+                    ${teacherAnalysisStatCard('Bilangan Gagal',s.failCount,'circle-x','rose')}
+                    ${teacherAnalysisStatCard('Peratus Lulus',`${s.passPct.toFixed(1)}%`,'percent','cyan')}
+                    ${teacherAnalysisStatCard('Peratus Gagal',`${s.failPct.toFixed(1)}%`,'percent','rose')}
+                    ${teacherAnalysisStatCard('Markah Tertinggi',s.numeric?.length?s.highest:'-','arrow-up','purple')}
+                    ${teacherAnalysisStatCard('Markah Terendah',s.numeric?.length?s.lowest:'-','arrow-down','amber')}
+                    ${teacherAnalysisStatCard('Purata Markah',s.numeric?.length?s.average.toFixed(2):'-','calculator','blue')}
+                    ${teacherAnalysisStatCard('Median',s.numeric?.length?s.median.toFixed(2):'-','sigma','purple')}
+                    ${teacherAnalysisStatCard('Belum Ada Markah',dataset.rows.filter(r=>r.noMark).length,'file-question','amber')}
+                </div></div>
+
+                <div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
+                    <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm"><h3 class="font-black text-slate-800 mb-4">Carta Pai Lulus dan Gagal</h3><div class="h-[310px]"><canvas id="ta-pass-chart"></canvas></div></div>
+                    <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm"><h3 class="font-black text-slate-800 mb-4">Bilangan Murid Mengikut Gred</h3><div class="h-[310px]"><canvas id="ta-grade-chart"></canvas></div></div>
+                    <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm"><h3 class="font-black text-slate-800 mb-4">Pencapaian TP1 hingga TP6</h3><div class="h-[310px]"><canvas id="ta-tp-chart"></canvas></div></div>
+                    <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm"><h3 class="font-black text-slate-800 mb-4">Perbandingan PS1, PS2 dan UASA</h3><div class="h-[310px]"><canvas id="ta-assessment-chart"></canvas></div></div>
+                    <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm"><h3 class="font-black text-slate-800 mb-4">Perbandingan Pencapaian Antara Kelas</h3><div class="h-[310px]"><canvas id="ta-class-chart"></canvas></div></div>
+                    <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm"><h3 class="font-black text-slate-800 mb-4">Graf Markah Setiap Murid</h3><div class="h-[310px]"><canvas id="ta-student-chart"></canvas></div></div>
+                </div>
+
+                <div class="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm"><div class="p-5 border-b border-slate-100"><h3 class="font-black text-slate-800">Ringkasan Gred dan Tahap Penguasaan</h3></div><div class="grid grid-cols-1 lg:grid-cols-2 gap-0"><div class="p-5 overflow-x-auto"><table class="w-full text-xs"><thead><tr class="bg-slate-50"><th class="p-3 text-left">Gred</th><th class="p-3">Bilangan</th><th class="p-3">Peratus Hadir</th></tr></thead><tbody>${Object.entries(dataset.gradeCounts).map(([g,n])=>`<tr class="border-b"><td class="p-3 font-black">${g}</td><td class="p-3 text-center">${n}</td><td class="p-3 text-center">${s.attended?(n/s.attended*100).toFixed(1):'0.0'}%</td></tr>`).join('')}</tbody></table></div><div class="p-5 overflow-x-auto border-t lg:border-t-0 lg:border-l border-slate-100"><table class="w-full text-xs"><thead><tr class="bg-slate-50"><th class="p-3 text-left">TP</th><th class="p-3">Bilangan</th><th class="p-3">Peratus Murid</th></tr></thead><tbody>${Object.entries(dataset.tpCounts).map(([tp,n])=>`<tr class="border-b"><td class="p-3 font-black">${tp}</td><td class="p-3 text-center">${n}</td><td class="p-3 text-center">${s.total?(n/s.total*100).toFixed(1):'0.0'}%</td></tr>`).join('')}</tbody></table></div></div></div>
+
+                <div class="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm"><div class="p-5 border-b border-slate-100 flex items-center justify-between"><div><h3 class="font-black text-slate-800">Senarai Murid Intervensi</h3><p class="text-xs text-slate-500 mt-1">Gagal, hampir lulus, markah menurun, TP1/TP2, belum ada markah atau PBD.</p></div><span class="px-3 py-1 rounded-full bg-rose-50 text-rose-700 text-xs font-black">${interventionRows.length} murid</span></div><div class="overflow-x-auto"><table id="teacher-intervention-table" class="w-full text-left"><thead class="bg-slate-800 text-white"><tr><th class="p-3 text-xs">Bil.</th><th class="p-3 text-xs">Nama Murid</th><th class="p-3 text-xs">Markah</th><th class="p-3 text-xs">Gred</th><th class="p-3 text-xs">TP</th><th class="p-3 text-xs">Kelemahan</th><th class="p-3 text-xs">Cadangan Intervensi</th><th class="p-3 text-xs">Status</th></tr></thead><tbody>${interventionHtml}</tbody></table></div></div>
+            </div>`;
+            lucide.createIcons();
+            setTimeout(() => renderTeacherAnalysisCharts(filters, dataset), 50);
+        }
+
+        function getClassAverageForAnalysis(kelas, filters) {
+            const roster = getStudentsByExactClass(kelas);
+            const vals = roster.map(s=>normalizeAnalysisMark(getAnalysisMarkValue(s.id,filters.year,filters.assessment,filters.subject))).filter(x=>x.hasMark).map(x=>x.value);
+            return vals.length ? vals.reduce((a,b)=>a+b,0)/vals.length : 0;
+        }
+
+        function getAssessmentAverageForAnalysis(assessment, filters) {
+            const roster = getStudentsByExactClass(filters.kelas);
+            const vals = roster.map(s=>normalizeAnalysisMark(getAnalysisMarkValue(s.id,filters.year,assessment,filters.subject))).filter(x=>x.hasMark).map(x=>x.value);
+            return vals.length ? vals.reduce((a,b)=>a+b,0)/vals.length : 0;
+        }
+
+        function renderTeacherAnalysisCharts(filters, dataset) {
+            if (typeof Chart === 'undefined') return;
+            const common = { responsive:true, maintainAspectRatio:false, plugins:{ legend:{ position:'bottom' } } };
+            const make = (id,config) => { const el=document.getElementById(id); if(el) teacherAnalysisCharts[id]=new Chart(el,config); };
+            make('ta-pass-chart',{type:'pie',data:{labels:['Lulus','Gagal'],datasets:[{data:[dataset.stats.passCount,dataset.stats.failCount]}]},options:common});
+            make('ta-grade-chart',{type:'bar',data:{labels:Object.keys(dataset.gradeCounts),datasets:[{label:'Bilangan Murid',data:Object.values(dataset.gradeCounts)}]},options:{...common,scales:{y:{beginAtZero:true,ticks:{precision:0}}}}});
+            make('ta-tp-chart',{type:'bar',data:{labels:Object.keys(dataset.tpCounts),datasets:[{label:'Bilangan Murid',data:Object.values(dataset.tpCounts)}]},options:{...common,scales:{y:{beginAtZero:true,ticks:{precision:0}}}}});
+            make('ta-assessment-chart',{type:'line',data:{labels:assessments.map(getAssessmentShortName),datasets:[{label:'Purata Markah',data:assessments.map(a=>Number(getAssessmentAverageForAnalysis(a,filters).toFixed(2))),tension:0.25,fill:false}]},options:{...common,scales:{y:{beginAtZero:true,max:100}}}});
+            const sameYearClasses = classes.filter(c=>String(c).startsWith(String(filters.kelas).charAt(0)+' '));
+            make('ta-class-chart',{type:'bar',data:{labels:sameYearClasses,datasets:[{label:'Purata Markah',data:sameYearClasses.map(c=>Number(getClassAverageForAnalysis(c,filters).toFixed(2)))}]},options:{...common,scales:{y:{beginAtZero:true,max:100}}}});
+            make('ta-student-chart',{type:'line',data:{labels:dataset.rows.map(r=>r.student.nama.split(' ')[0]),datasets:[{label:'Markah Murid',data:dataset.rows.map(r=>r.markObj.hasMark?r.markObj.value:null),tension:0.15,spanGaps:false}]},options:{...common,scales:{y:{beginAtZero:true,max:100}},plugins:{...common.plugins,tooltip:{callbacks:{title:(items)=>items.length?dataset.rows[items[0].dataIndex].student.nama:''}}}}});
+        }
+
+        async function refreshTeacherAnalysisData() {
+            try {
+                if (supabaseEnabled && supabaseClient) await fetchAllDataFromSupabase();
+                renderTeacherSubjectAnalysisPage();
+                showToast('Analisis telah disegarkan. Markah asal tidak diubah.', 'success');
+            } catch (e) {
+                console.error(e);
+                showToast('Analisis tidak dapat disegarkan.', 'danger');
+            }
+        }
+
+        function exportTeacherAnalysisCSV() {
+            const filters = { year:selectedYear, kelas:selectedClass, assessment:selectedAssessment, subject:selectedSubject };
+            const data = buildTeacherAnalysisDataset(filters);
+            const rows = getTeacherInterventionRows(data);
+            const lines = [
+                ['ANALISIS GURU SUBJEK'],['Sesi',filters.year],['Kelas',filters.kelas],['Pentaksiran',filters.assessment],['Subjek',filters.subject],[],
+                ['Jumlah Murid',data.stats.total],['Jumlah Hadir',data.stats.attended],['Jumlah Tidak Hadir',data.stats.absent],['Bilangan Lulus',data.stats.passCount],['Bilangan Gagal',data.stats.failCount],['Peratus Lulus',data.stats.passPct.toFixed(1)+'%'],['Peratus Gagal',data.stats.failPct.toFixed(1)+'%'],['Markah Tertinggi',data.numeric.length?data.stats.highest:'-'],['Markah Terendah',data.numeric.length?data.stats.lowest:'-'],['Purata',data.numeric.length?data.stats.average.toFixed(2):'-'],['Median',data.numeric.length?data.stats.median.toFixed(2):'-'],[],
+                ['Bil','Nama Murid','Markah','Gred','TP','Kategori','Kelemahan','Cadangan Intervensi','Status']
+            ];
+            const statusMap=getInterventionStatusMap();
+            rows.forEach((r,i)=>{const k=`${filters.year}|${filters.kelas}|${filters.assessment}|${filters.subject}|${r.student.id}`;lines.push([i+1,r.student.nama,r.markObj.hasMark?r.markObj.value:(r.markObj.absent?'TH':'-'),r.grade,r.pbd||'-',r.categories.join(' / '),r.weakness,r.intervention,statusMap[k]||'Belum Bermula']);});
+            const csv='\ufeff'+lines.map(row=>row.map(csvSafe).join(',')).join('\n');
+            const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=`Analisis_Guru_${filters.kelas}_${filters.subject}_${getAssessmentShortName(filters.assessment)}_${filters.year}.csv`.replace(/[^a-zA-Z0-9_.-]+/g,'_');document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(url);showToast('Analisis berjaya dieksport ke CSV.','success');
+        }
+
+        function printTeacherAnalysis() {
+            document.body.classList.add('teacher-analysis-print-mode');
+            window.print();
+            setTimeout(()=>document.body.classList.remove('teacher-analysis-print-mode'),500);
+        }
+
         // --- RENDER DYNAMIC PAGES ---
         function renderPage() {
             const content = document.getElementById('page-content');
@@ -3901,6 +4236,12 @@ if (type === 'guru_kelas') {
                 return;
             }
             
+            if (currentPage === 'analisis_guru_subjek') {
+                document.getElementById('page-title').innerText = 'ANALISIS GURU SUBJEK';
+                renderTeacherSubjectAnalysisPage();
+                return;
+            }
+
             if (currentPage === 'borang_diskusi_akauntabaliti') {
                 document.getElementById('page-title').innerText = 'BORANG DA';
                 renderBorangDiskusiAkauntabaliti();
