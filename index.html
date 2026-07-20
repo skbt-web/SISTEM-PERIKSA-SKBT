@@ -3299,6 +3299,26 @@ if (type === 'guru_kelas') {
         let sismarAIQuestionCount = 10;
         let sismarAIQuestionType = 'Campuran';
 
+        // Topik cadangan SISMAR AI. Digunakan untuk membantu guru memilih topik sahaja.
+        // Data markah dan PBD tidak diubah oleh modul ini.
+        const sismarAITopicsBySubject = {
+            'BAHASA MELAYU': ['Pemahaman','Tatabahasa','Kata Nama','Kata Kerja','Kata Adjektif','Penjodoh Bilangan','Peribahasa','Penulisan'],
+            'BAHASA INGGERIS': ['Reading Comprehension','Grammar','Vocabulary','Nouns','Verbs','Adjectives','Sentence Construction','Writing'],
+            'MATEMATIK': ['Nombor Bulat','Operasi Asas','Pecahan','Perpuluhan','Wang','Masa dan Waktu','Panjang, Jisim dan Isipadu','Bentuk dan Ruang','Koordinat','Penyelesaian Masalah'],
+            'SAINS': ['Kemahiran Saintifik','Manusia','Haiwan','Tumbuhan','Tenaga','Bahan','Daya','Bumi dan Angkasa','Teknologi'],
+            'PENDIDIKAN ISLAM': ['Al-Quran','Hadis','Akidah','Ibadah','Sirah','Adab','Jawi'],
+            'BAHASA ARAB': ['Kosa Kata','Kefahaman','Tatabahasa','Kata Nama','Kata Kerja','Ayat Mudah','Penulisan'],
+            'PENDIDIKAN JASMANI DAN KESIHATAN': ['Kemahiran Pergerakan','Permainan','Kecergasan','Keselamatan','Pemakanan','Kesihatan Diri'],
+            'MUZIK': ['Irama','Melodi','Tempo','Dinamik','Nyanyian','Alat Muzik','Notasi Muzik'],
+            'PENDIDIKAN SENI VISUAL': ['Bahasa Seni Visual','Menggambar','Membuat Corak','Membentuk dan Membuat Binaan','Kraf Tradisional','Apresiasi Seni'],
+            'SEJARAH': ['Kemahiran Sejarah','Zaman Prasejarah','Kerajaan Melayu Awal','Tokoh Negara','Kemerdekaan','Institusi Raja','Identiti Negara'],
+            'REKA BENTUK TEKNOLOGI': ['Reka Bentuk','Pengurusan Projek','Teknologi Pertanian','Reka Bentuk Makanan','Elektrik dan Elektronik','Pengaturcaraan Asas']
+        };
+
+        function getSismarAITopicOptions(subject) {
+            return sismarAITopicsBySubject[subject] || ['Kemahiran Asas','Pengukuhan','Aplikasi','KBAT'];
+        }
+
         function getSismarAIStudentRows(kelas = sismarAISelectedClass, subject = sismarAISelectedSubject, year = sismarAISelectedYear, assessment = sismarAISelectedAssessment) {
             return getStudentsByExactClass(kelas).map(student => {
                 const key = `${student.id}_${year}_${assessment}_${subject}`;
@@ -3358,7 +3378,11 @@ if (type === 'guru_kelas') {
             if (name === 'tahun') sismarAISelectedYear = value;
             if (name === 'assessment') sismarAISelectedAssessment = value;
             if (name === 'kelas') { sismarAISelectedClass = value; sismarAISelectedStudentId = ''; }
-            if (name === 'subject') { sismarAISelectedSubject = value; sismarAISelectedStudentId = ''; }
+            if (name === 'subject') {
+                sismarAISelectedSubject = value;
+                sismarAISelectedStudentId = '';
+                if (!getSismarAITopicOptions(value).includes(sismarAISelectedTopic)) sismarAISelectedTopic = '';
+            }
             renderPage();
         }
 
@@ -3443,9 +3467,13 @@ if (type === 'guru_kelas') {
                                     <select id="sismar-ai-student" onchange="setSismarAIStudent(this.value)" class="p-3 border border-slate-200 rounded-xl text-xs font-bold"><option value="">Pilih murid</option>${studentOptions}</select>
                                 </div>
                                 <div id="sismar-ai-student-profile" class="p-4 rounded-2xl bg-slate-50 border border-slate-100">${renderSismarAIStudentProfile(selectedStudent)}</div>
-                                <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
-                                    <input id="sismar-ai-topic" value="${escapeHtml(sismarAISelectedTopic)}" oninput="sismarAISelectedTopic=this.value" class="md:col-span-2 p-3 border border-slate-200 rounded-xl text-xs font-semibold" placeholder="Topik atau kemahiran intervensi, contoh: Operasi tambah dalam lingkungan 100">
-                                    <select id="sismar-ai-question-count" onchange="sismarAIQuestionCount=Number(this.value)" class="p-3 border border-slate-200 rounded-xl text-xs font-bold">${[5,10,15,20].map(n => `<option value="${n}" ${n===sismarAIQuestionCount?'selected':''}>${n} soalan</option>`).join('')}</select>
+                                <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
+                                    <div class="md:col-span-2">
+                                        <input id="sismar-ai-topic" list="sismar-ai-topic-list" value="${escapeHtml(sismarAISelectedTopic)}" oninput="sismarAISelectedTopic=this.value" class="w-full p-3 border border-slate-200 rounded-xl text-xs font-semibold" placeholder="Pilih atau taip topik/kemahiran intervensi">
+                                        <datalist id="sismar-ai-topic-list">${getSismarAITopicOptions(sismarAISelectedSubject).map(t => `<option value="${escapeHtml(t)}"></option>`).join('')}</datalist>
+                                    </div>
+                                    <select id="sismar-ai-question-type" onchange="sismarAIQuestionType=this.value" class="p-3 border border-slate-200 rounded-xl text-xs font-bold">${['Campuran','Objektif','Struktur','Subjektif','Isi Tempat Kosong','Benar atau Salah','KBAT'].map(v => `<option value="${v}" ${v===sismarAIQuestionType?'selected':''}>${v}</option>`).join('')}</select>
+                                    <select id="sismar-ai-question-count" onchange="sismarAIQuestionCount=Number(this.value)" class="p-3 border border-slate-200 rounded-xl text-xs font-bold">${[5,10,15,20,30].map(n => `<option value="${n}" ${n===sismarAIQuestionCount?'selected':''}>${n} soalan</option>`).join('')}</select>
                                 </div>
                                 <div class="flex flex-wrap gap-2">
                                     <button id="sismar-ai-run-btn" onclick="runSismarAI()" class="px-5 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-black flex items-center gap-2"><i data-lucide="sparkles" class="w-4 h-4"></i> JANA ANALISIS PINTAR</button>
@@ -3474,21 +3502,91 @@ if (type === 'guru_kelas') {
                 </div>`;
         }
 
+        function getSismarAIGrade(mark) {
+            if (!Number.isFinite(mark)) return '-';
+            if (mark >= 80) return 'A';
+            if (mark >= 65) return 'B';
+            if (mark >= 50) return 'C';
+            if (mark >= 40) return 'D';
+            if (mark >= 20) return 'E';
+            return 'F';
+        }
+
+        function buildSismarAIQuestions(subject, topic, count, type, level) {
+            const t = topic || getSismarAITopicOptions(subject)[0] || 'kemahiran yang dipilih';
+            const total = Math.max(1, Number(count) || 10);
+            const questionType = type || 'Campuran';
+            const subjectTemplates = {
+                'MATEMATIK': [
+                    `Selesaikan satu soalan ${level} berkaitan ${t} dan tunjukkan langkah pengiraan.`,
+                    `Nyatakan kaedah yang sesuai untuk menyelesaikan masalah berkaitan ${t}.`,
+                    `Bina satu ayat matematik berdasarkan situasi harian yang melibatkan ${t}.`,
+                    `Semak penyelesaian berikut dan jelaskan kesalahan yang mungkin berlaku dalam topik ${t}.`
+                ],
+                'BAHASA MELAYU': [
+                    `Bina satu ayat gramatis menggunakan kemahiran ${t}.`,
+                    `Kenal pasti dan betulkan kesalahan bahasa berkaitan ${t}.`,
+                    `Baca petikan ringkas dan jawab soalan yang menguji ${t}.`,
+                    `Terangkan penggunaan ${t} dalam konteks ayat yang betul.`
+                ],
+                'BAHASA INGGERIS': [
+                    `Construct a correct sentence using ${t}.`,
+                    `Choose the best answer for a question about ${t}.`,
+                    `Correct the language error related to ${t}.`,
+                    `Read a short situation and respond using ${t}.`
+                ],
+                'SAINS': [
+                    `Nyatakan satu fakta penting berkaitan ${t}.`,
+                    `Jelaskan sebab dan kesan bagi satu situasi berkaitan ${t}.`,
+                    `Cadangkan satu penyiasatan mudah untuk menguji konsep ${t}.`,
+                    `Ramalkan keputusan satu eksperimen berkaitan ${t} dan berikan alasan.`
+                ]
+            };
+            const generic = [
+                `Nyatakan maksud atau konsep asas bagi ${t}.`,
+                `Berikan satu contoh yang betul berkaitan ${t}.`,
+                `Terangkan langkah atau proses berkaitan ${t}.`,
+                `Aplikasikan pengetahuan ${t} dalam satu situasi harian.`
+            ];
+            const templates = subjectTemplates[subject] || generic;
+            const objectiveOptions = ['A. Pilihan 1', 'B. Pilihan 2', 'C. Pilihan 3', 'D. Pilihan 4'];
+            return Array.from({length: total}, (_, i) => {
+                const base = templates[i % templates.length];
+                const qNo = i + 1;
+                if (questionType === 'Objektif' || (questionType === 'Campuran' && i % 4 === 0)) return `${qNo}. ${base}\n   ${objectiveOptions.join('   ')}`;
+                if (questionType === 'Isi Tempat Kosong' || (questionType === 'Campuran' && i % 4 === 1)) return `${qNo}. Lengkapkan pernyataan berikut berkaitan ${t}: ______________________________.`;
+                if (questionType === 'Benar atau Salah') return `${qNo}. Tandakan BENAR atau SALAH bagi pernyataan berkaitan ${t}: ______________________________.`;
+                if (questionType === 'KBAT' || (questionType === 'Campuran' && i % 4 === 3)) return `${qNo}. ${base} Berikan alasan dan bukti yang menyokong jawapan anda.`;
+                return `${qNo}. ${base}`;
+            }).join('\n\n');
+        }
+
         function buildLocalSismarAIResponse(mode, snapshot, student, topic) {
             const riskNames = snapshot.risikoTinggi.slice(0, 10).map((r,i) => `${i+1}. ${r.nama} (${r.mark===null?'-':r.mark+'%'}, ${r.pbd})`).join('\n') || 'Tiada murid risiko tinggi.';
-            if (mode === 'kelas') return `ANALISIS KELAS\n\nKelas: ${snapshot.kelas}\nPentaksiran: ${snapshot.assessment}\nPurata: ${snapshot.purata}%\nMurid dianalisis: ${snapshot.jumlahMurid}\nRisiko tinggi: ${snapshot.risikoTinggi.length}\nRisiko sederhana: ${snapshot.risikoSederhana.length}\n\nMurid keutamaan:\n${riskNames}\n\nTindakan: selaraskan intervensi guru subjek, pantau dua minggu dan jalankan pentaksiran semula.`;
-            if (mode === 'pbd') return `ANALISIS PBD\n\nKelas: ${snapshot.kelas}\nSubjek: ${snapshot.subject}\nTP1: ${snapshot.tpCounts.TP1}\nTP2: ${snapshot.tpCounts.TP2}\nTP3: ${snapshot.tpCounts.TP3}\nTP4: ${snapshot.tpCounts.TP4}\nTP5: ${snapshot.tpCounts.TP5}\nTP6: ${snapshot.tpCounts.TP6}\n\nKeutamaan diberikan kepada murid TP1 dan TP2 melalui bimbingan individu, bahan konkrit, latihan berperingkat dan penilaian semula.`;
+            const marks = snapshot.murid.map(r => r.mark).filter(Number.isFinite);
+            const lulus = marks.filter(v => v >= 40).length;
+            const gagal = marks.filter(v => v < 40).length;
+            const lulusPct = marks.length ? ((lulus / marks.length) * 100).toFixed(1) : '0.0';
+            const gagalPct = marks.length ? ((gagal / marks.length) * 100).toFixed(1) : '0.0';
+            const gradeCounts = {A:0,B:0,C:0,D:0,E:0,F:0};
+            marks.forEach(v => { const g = getSismarAIGrade(v); if (gradeCounts[g] !== undefined) gradeCounts[g]++; });
+
+            if (mode === 'kelas') return `ANALISIS KELAS\n\nKelas: ${snapshot.kelas}\nPentaksiran: ${snapshot.assessment}\nJumlah murid dianalisis: ${snapshot.jumlahMurid}\nJumlah mempunyai markah: ${snapshot.jumlahMarkah}\nPurata kelas: ${snapshot.purata}%\nMarkah tertinggi: ${snapshot.tertinggi}%\nMarkah terendah: ${snapshot.terendah}%\nLulus: ${lulus} (${lulusPct}%)\nGagal: ${gagal} (${gagalPct}%)\nRisiko tinggi: ${snapshot.risikoTinggi.length}\nRisiko sederhana: ${snapshot.risikoSederhana.length}\n\nAGIHAN GRED\nA: ${gradeCounts.A} | B: ${gradeCounts.B} | C: ${gradeCounts.C} | D: ${gradeCounts.D} | E: ${gradeCounts.E} | F: ${gradeCounts.F}\n\nMURID KEUTAMAAN\n${riskNames}\n\nCADANGAN TINDAKAN\n1. Kelompokkan murid mengikut tahap keperluan.\n2. Jalankan intervensi berfokus selama dua minggu.\n3. Gunakan latihan berperingkat dan maklum balas segera.\n4. Laksanakan pentaksiran semula dan bandingkan peningkatan.`;
+
+            if (mode === 'pbd') return `ANALISIS PBD\n\nKelas: ${snapshot.kelas}\nSubjek: ${snapshot.subject}\nPentaksiran: ${snapshot.assessment}\nTP1: ${snapshot.tpCounts.TP1}\nTP2: ${snapshot.tpCounts.TP2}\nTP3: ${snapshot.tpCounts.TP3}\nTP4: ${snapshot.tpCounts.TP4}\nTP5: ${snapshot.tpCounts.TP5}\nTP6: ${snapshot.tpCounts.TP6}\n\nINTERPRETASI\nMurid TP1 dan TP2 memerlukan pemulihan berstruktur. Murid TP3 memerlukan pengukuhan. Murid TP4 hingga TP6 sesuai menerima aktiviti aplikasi, pengayaan dan KBAT.\n\nTINDAKAN PBD\n1. Tetapkan kemahiran khusus yang belum dikuasai.\n2. Gunakan bahan visual, manipulatif atau demonstrasi.\n3. Rekod evidens semasa aktiviti.\n4. Nilai semula selepas intervensi dan kemas kini TP hanya melalui modul PBD asal.`;
+
             if (!student) return 'Sila pilih murid yang mempunyai data markah atau PBD.';
-            const level = student.mark !== null && student.mark < 40 || ['TP1','TP2'].includes(student.pbd) ? 'asas dan berpandu' : student.mark !== null && student.mark < 65 || student.pbd === 'TP3' ? 'pengukuhan sederhana' : 'aplikasi dan pengayaan';
+            const level = (student.mark !== null && student.mark < 40) || ['TP1','TP2'].includes(student.pbd) ? 'asas dan berpandu' : (student.mark !== null && student.mark < 65) || student.pbd === 'TP3' ? 'pengukuhan sederhana' : 'aplikasi dan pengayaan';
+
             if (mode === 'soalan') {
-                const t = topic || 'kemahiran yang dipilih oleh guru';
-                const questions = Array.from({length:sismarAIQuestionCount}, (_,i) => `${i+1}. Soalan ${level} berkaitan ${t}.`).join('\n');
-                return `SET SOALAN INTERVENSI\n\nNama: ${student.nama}\nKelas: ${student.kelas}\nSubjek: ${snapshot.subject}\nMarkah: ${student.mark===null?'-':student.mark+'%'}\nPBD: ${student.pbd}\nTopik: ${t}\nTahap: ${level}\n\nARAHAN\nJawab semua soalan. Guru boleh menyunting soalan mengikut kandungan DSKP.\n\n${questions}\n\nSKEMA CADANGAN\nSediakan jawapan berdasarkan topik sebenar yang dipilih guru. Semak kesesuaian fakta sebelum digunakan.`;
+                const t = topic || getSismarAITopicOptions(snapshot.subject)[0] || 'kemahiran yang dipilih oleh guru';
+                const questions = buildSismarAIQuestions(snapshot.subject, t, sismarAIQuestionCount, sismarAIQuestionType, level);
+                return `SET SOALAN INTERVENSI\n\nNama: ${student.nama}\nKelas: ${student.kelas}\nSubjek: ${snapshot.subject}\nPentaksiran: ${snapshot.assessment}\nMarkah: ${student.mark===null?'-':student.mark+'%'}\nPBD: ${student.pbd}\nTopik: ${t}\nJenis Soalan: ${sismarAIQuestionType}\nTahap: ${level}\nBilangan: ${sismarAIQuestionCount}\n\nARAHAN\nJawab semua soalan. Guru perlu menyemak kesesuaian kandungan dengan DSKP dan topik sebenar sebelum digunakan.\n\n${questions}\n\nSKEMA / PANDUAN PEMARKAHAN\n1. Terima jawapan yang tepat dari segi fakta, konsep dan langkah.\n2. Bagi soalan objektif, guru tetapkan pilihan jawapan sebenar mengikut kandungan yang diajar.\n3. Bagi soalan struktur atau KBAT, berikan markah pada fakta, huraian, langkah dan alasan.\n4. Gunakan hasil latihan sebagai evidens intervensi, bukan sebagai pengganti rekod markah asal.`;
             }
-            if (mode === 'intervensi') {
-                return `PELAN INTERVENSI INDIVIDU\n\nNama Murid: ${student.nama}\nKelas: ${student.kelas}\nSubjek: ${snapshot.subject}\nPentaksiran: ${snapshot.assessment}\nMarkah Awal: ${student.mark===null?'-':student.mark+'%'}\nPBD Awal: ${student.pbd}\nKategori: ${student.risk}\nTopik/Kemahiran: ${topic || 'Perlu ditetapkan oleh guru'}\n\nDIAGNOSIS\nMurid memerlukan intervensi ${level} berdasarkan markah pentaksiran dan PBD yang direkodkan.\n\nOBJEKTIF\nMurid menunjukkan peningkatan sekurang-kurangnya 20 mata peratus atau meningkat satu tahap penguasaan selepas intervensi.\n\nAKTIVITI\n1. Bimbingan kumpulan kecil selama 20 minit.\n2. Penerangan semula menggunakan contoh mudah dan bahan visual.\n3. Latihan berperingkat daripada aras asas kepada aplikasi.\n4. Maklum balas segera dan pembetulan kesalahan.\n5. Ujian pasca selepas dua minggu.\n\nTEMPOH\nDua minggu, tiga sesi seminggu.\n\nINDIKATOR KEJAYAAN\nMencapai sekurang-kurangnya 70% atau meningkat satu TP.\n\nTINDAKAN SUSULAN\nRekod markah pasca, semak perkembangan dan sambung intervensi jika sasaran belum dicapai.`;
-            }
-            return `ANALISIS SUBJEK\n\nSubjek: ${snapshot.subject}\nKelas: ${snapshot.kelas}\nPentaksiran: ${snapshot.assessment}\nPurata: ${snapshot.purata}%\nTertinggi: ${snapshot.tertinggi}%\nTerendah: ${snapshot.terendah}%\nRisiko tinggi: ${snapshot.risikoTinggi.length}\nRisiko sederhana: ${snapshot.risikoSederhana.length}\n\nMurid keutamaan:\n${riskNames}\n\nCadangan: jalankan intervensi mengikut tahap murid, sediakan latihan berperingkat dan buat pentaksiran semula selepas dua minggu.`;
+
+            if (mode === 'intervensi') return `PELAN INTERVENSI INDIVIDU\n\nNama Murid: ${student.nama}\nKelas: ${student.kelas}\nSubjek: ${snapshot.subject}\nPentaksiran: ${snapshot.assessment}\nMarkah Awal: ${student.mark===null?'-':student.mark+'%'}\nPBD Awal: ${student.pbd}\nKategori: ${student.risk}\nTopik/Kemahiran: ${topic || 'Perlu ditetapkan oleh guru'}\n\nDIAGNOSIS\nMurid memerlukan intervensi ${level} berdasarkan markah pentaksiran dan PBD yang direkodkan.\n\nOBJEKTIF\nMurid menunjukkan peningkatan sekurang-kurangnya 20 mata peratus atau meningkat satu tahap penguasaan selepas intervensi.\n\nAKTIVITI\n1. Bimbingan kumpulan kecil selama 20 minit.\n2. Penerangan semula menggunakan contoh mudah dan bahan visual.\n3. Latihan berperingkat daripada aras asas kepada aplikasi.\n4. Maklum balas segera dan pembetulan kesalahan.\n5. Ujian pasca selepas dua minggu.\n\nTEMPOH\nDua minggu, tiga sesi seminggu.\n\nINDIKATOR KEJAYAAN\nMencapai sekurang-kurangnya 70% atau meningkat satu TP.\n\nTINDAKAN SUSULAN\nRekod markah pasca secara berasingan, semak perkembangan dan sambung intervensi jika sasaran belum dicapai.`;
+
+            return `ANALISIS SUBJEK\n\nSubjek: ${snapshot.subject}\nKelas: ${snapshot.kelas}\nPentaksiran: ${snapshot.assessment}\nJumlah murid dianalisis: ${snapshot.jumlahMurid}\nPurata: ${snapshot.purata}%\nTertinggi: ${snapshot.tertinggi}%\nTerendah: ${snapshot.terendah}%\nLulus: ${lulus} (${lulusPct}%)\nGagal: ${gagal} (${gagalPct}%)\nRisiko tinggi: ${snapshot.risikoTinggi.length}\nRisiko sederhana: ${snapshot.risikoSederhana.length}\n\nAGIHAN GRED\nA: ${gradeCounts.A} | B: ${gradeCounts.B} | C: ${gradeCounts.C} | D: ${gradeCounts.D} | E: ${gradeCounts.E} | F: ${gradeCounts.F}\n\nMURID KEUTAMAAN\n${riskNames}\n\nCADANGAN INTERVENSI SUBJEK\n1. Kenal pasti topik atau kemahiran yang paling lemah.\n2. Sediakan latihan diagnostik pendek.\n3. Jalankan pemulihan untuk risiko tinggi dan pengukuhan untuk risiko sederhana.\n4. Sediakan pengayaan atau KBAT kepada murid risiko rendah.\n5. Nilai semula selepas dua minggu dan dokumentasikan perubahan.`;
         }
 
         async function runSismarAI() {
@@ -3506,7 +3604,11 @@ if (type === 'guru_kelas') {
             try {
                 if (supabaseEnabled && supabaseClient && ['subjek','kelas','pbd'].includes(mode)) {
                     const { data, error } = await supabaseClient.functions.invoke(SISMAR_AI_FUNCTION_NAME, {
-                        body: { kelas: snapshot.kelas, tahun: snapshot.tahun, subject: snapshot.subject, assessment: snapshot.assessment }
+                        body: {
+                            mode, kelas: snapshot.kelas, tahun: snapshot.tahun, subject: snapshot.subject,
+                            assessment: snapshot.assessment, topic, question_count: sismarAIQuestionCount,
+                            question_type: sismarAIQuestionType, student: student || null, snapshot
+                        }
                     });
                     if (!error && data?.success && data?.analisis) aiText = data.analisis;
                 }
